@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
 import { triviaQuestions } from '@/lib/questions'
-import { Game, Team, Answer, getTeamColor, DEFAULT_SETTINGS, REVEAL_TIME_SECONDS } from '@/lib/types'
+import { Game, Team, Answer, getTeamColor, DEFAULT_SETTINGS } from '@/lib/types'
 
 const POINTS_BY_ORDER = [300, 250, 200, 175, 150, 125, 100, 100, 100, 100]
+const REVEAL_ANSWER_TIME = 2000 // Show correct answer for 2 seconds
+const REVEAL_WINNERS_TIME = 4000 // Show winners for 4 seconds
+
+type RevealPhase = 'none' | 'answer' | 'winners'
 
 export default function HostPage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = use(params)
@@ -20,18 +24,15 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
-  const [revealedPoints, setRevealedPoints] = useState<Record<string, number>>({})
+  const [revealPhase, setRevealPhase] = useState<RevealPhase>('none')
+  const [winners, setWinners] = useState<Array<{team: Team, points: number, position: number}>>([])
   
   const gameRef = useRef<Game | null>(null)
-  const teamsRef = useRef<Team[]>([])
-  const answersRef = useRef<Answer[]>([])
   const settingsRef = useRef(DEFAULT_SETTINGS)
   const pausedTimeRef = useRef<number | null>(null)
   const hasRevealedRef = useRef(false)
 
   useEffect(() => { gameRef.current = game }, [game])
-  useEffect(() => { teamsRef.current = teams }, [teams])
-  useEffect(() => { answersRef.current = answers }, [answers])
   useEffect(() => { settingsRef.current = settings }, [settings])
   useEffect(() => { setHostUrl(window.location.origin) }, [])
 
@@ -70,6 +71,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     return () => { supabase.removeChannel(channel) }
   }, [gameId])
 
+  // Auto-reveal when all teams answer
   useEffect(() => {
     if (game?.status !== 'playing' || hasRevealedRef.current) return
     const currentAnswers = answers.filter(a => a.question_index === game.current_question)
@@ -83,33 +85,48 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     const currentGame = gameRef.current
     if (!currentGame) return
     
+    // Phase 1: Show correct answer
+    setRevealPhase('answer')
+    await supabase.from('games').update({ status: 'revealing' }).eq('id', gameId)
+    setGame(prev => prev ? { ...prev, status: 'revealing' } : null)
+    
+    // Fetch fresh data and calculate scores
     const { data: freshAnswers } = await supabase.from('answers').select()
       .eq('game_id', gameId).eq('question_index', currentGame.current_question ?? 0)
       .order('answered_at', { ascending: true })
     const { data: freshTeams } = await supabase.from('teams').select().eq('game_id', gameId)
+    
     if (!freshAnswers || !freshTeams) return
     
     let correctOrderIndex = 0
-    const pointsMap: Record<string, number> = {}
+    const winnersData: Array<{team: Team, points: number, position: number}> = []
     
     for (const answer of freshAnswers) {
       if (answer.is_correct) {
         const points = POINTS_BY_ORDER[correctOrderIndex] || 100
-        pointsMap[answer.team_id] = points
         await supabase.from('answers').update({ points_earned: points }).eq('id', answer.id)
+        
         const team = freshTeams.find(t => t.id === answer.team_id)
         if (team) {
-          await supabase.from('teams').update({ score: team.score + points }).eq('id', team.id)
-          setTeams(prev => prev.map(t => t.id === team.id ? { ...t, score: team.score + points } : t))
+          const newScore = team.score + points
+          await supabase.from('teams').update({ score: newScore }).eq('id', team.id)
+          setTeams(prev => prev.map(t => t.id === team.id ? { ...t, score: newScore } : t))
+          winnersData.push({ team: { ...team, score: newScore }, points, position: correctOrderIndex + 1 })
         }
         correctOrderIndex++
       }
     }
     
-    setRevealedPoints(pointsMap)
-    await supabase.from('games').update({ status: 'revealing' }).eq('id', gameId)
-    setGame(prev => prev ? { ...prev, status: 'revealing' } : null)
-    setTimeout(() => nextQuestion(), REVEAL_TIME_SECONDS * 1000)
+    // Phase 2: Show winners after delay
+    setTimeout(() => {
+      setWinners(winnersData)
+      setRevealPhase('winners')
+      
+      // Phase 3: Move to next question after showing winners
+      setTimeout(() => {
+        nextQuestion()
+      }, REVEAL_WINNERS_TIME)
+    }, REVEAL_ANSWER_TIME)
   }
 
   useEffect(() => {
@@ -137,11 +154,12 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const startGame = async () => {
     if (teams.length < 1) return
     hasRevealedRef.current = false
+    setRevealPhase('none')
+    setWinners([])
     await supabase.from('games').update({ status: 'playing', current_question: 0, question_start_time: new Date().toISOString(), question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions }).eq('id', gameId)
     await supabase.from('teams').update({ has_answered: false }).eq('game_id', gameId)
     setGame(prev => prev ? { ...prev, status: 'playing', current_question: 0, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions } : null)
     setTimeLeft(settings.questionTime)
-    setRevealedPoints({})
   }
 
   const pauseGame = async () => {
@@ -170,7 +188,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     const currentSettings = settingsRef.current
     const currentGame = gameRef.current
     hasRevealedRef.current = false
-    setRevealedPoints({})
+    setRevealPhase('none')
+    setWinners([])
     
     const nextQ = (currentGame?.current_question ?? 0) + 1
     if (nextQ >= Math.min(currentSettings.totalQuestions, triviaQuestions.length)) {
@@ -196,7 +215,6 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
 
   return (
     <div className="min-h-screen wood-background relative overflow-hidden">
-      {/* Decorative Elements */}
       <div className="absolute top-16 left-8 text-6xl opacity-20 animate-pulse">🎄</div>
       <div className="absolute top-16 right-8 text-6xl opacity-20 animate-pulse" style={{animationDelay: '1s'}}>🎄</div>
       <div className="absolute bottom-8 left-12 text-5xl opacity-15">🎁</div>
@@ -226,20 +244,17 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
               <div>
                 <label className="text-yellow-300 text-lg mb-3 block">Time per Question: <span className="text-white font-bold text-2xl">{settings.questionTime}s</span></label>
                 <input type="range" min="10" max="60" step="5" value={settings.questionTime} onChange={(e) => setSettings(s => ({ ...s, questionTime: parseInt(e.target.value) }))} className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400" />
-                <div className="flex justify-between text-gray-400 text-sm mt-2"><span>10s</span><span>60s</span></div>
               </div>
               <div>
                 <label className="text-yellow-300 text-lg mb-3 block">Questions: <span className="text-white font-bold text-2xl">{settings.totalQuestions}</span></label>
                 <input type="range" min="5" max={triviaQuestions.length} step="1" value={settings.totalQuestions} onChange={(e) => setSettings(s => ({ ...s, totalQuestions: parseInt(e.target.value) }))} className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400" />
-                <div className="flex justify-between text-gray-400 text-sm mt-2"><span>5</span><span>{triviaQuestions.length}</span></div>
               </div>
               <div className="bg-black/40 p-4 rounded-xl border border-yellow-400/30">
-                <p className="text-yellow-300 text-sm font-bold mb-2">🏆 Points System</p>
-                <p className="text-gray-300 text-sm">1st: 300 • 2nd: 250 • 3rd: 200 • 4th: 175 • 5th+: 150-100</p>
+                <p className="text-yellow-300 text-sm font-bold mb-2">🏆 Points: 1st: 300 • 2nd: 250 • 3rd: 200...</p>
               </div>
-              <div className="flex gap-4 pt-2">
-                <button onClick={() => { setShowSettings(false); if (game?.status === 'paused') setShowMenu(true) }} className="flex-1 bg-gradient-to-br from-gray-600 to-gray-700 text-white text-xl font-bold py-4 px-4 rounded-xl border-4 border-gray-500 shadow-lg hover:scale-105 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Cancel</button>
-                <button onClick={saveSettings} className="flex-1 bg-gradient-to-br from-green-600 to-green-700 text-white text-xl font-bold py-4 px-4 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Save</button>
+              <div className="flex gap-4">
+                <button onClick={() => { setShowSettings(false); if (game?.status === 'paused') setShowMenu(true) }} className="flex-1 bg-gradient-to-br from-gray-600 to-gray-700 text-white text-xl font-bold py-4 rounded-xl border-4 border-gray-500 hover:scale-105 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Cancel</button>
+                <button onClick={saveSettings} className="flex-1 bg-gradient-to-br from-green-600 to-green-700 text-white text-xl font-bold py-4 rounded-xl border-4 border-yellow-400 hover:scale-105 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Save</button>
               </div>
             </div>
           </div>
@@ -253,29 +268,21 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
             <p className="text-yellow-300/80 text-xs uppercase tracking-wider">Game Code</p>
             <p className="text-4xl font-bold text-white tracking-[0.3em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
           </div>
-
-          <div className="text-center">
-            <h1 className="text-5xl font-bold text-white" style={{ fontFamily: 'Mountains of Christmas, cursive', textShadow: '3px 3px 6px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.2)' }}>
-              🎄 Christmas Trivia 🎄
-            </h1>
-          </div>
-
+          <h1 className="text-5xl font-bold text-white" style={{ fontFamily: 'Mountains of Christmas, cursive', textShadow: '3px 3px 6px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.2)' }}>🎄 Christmas Trivia 🎄</h1>
           <div className="flex items-center gap-4">
             {(game.status === 'playing' || game.status === 'paused') && (
               <button onClick={pauseGame} className="bg-gradient-to-br from-yellow-600 to-orange-600 text-white text-2xl font-bold py-3 px-6 rounded-xl border-2 border-yellow-400 shadow-lg hover:scale-105 transition-transform">⏸️</button>
             )}
             <div className="candy-cane-border shadow-lg">
-              <div className="bg-gray-900 px-8 py-4 rounded-xl min-w-[160px] text-center">
+              <div className="bg-gray-900 px-8 py-4 rounded-xl min-w-[140px] text-center">
                 {game.status === 'playing' ? (
-                  <span className={`text-6xl font-bold ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`} style={{ fontFamily: 'Cinzel Decorative, serif' }}>
-                    {timeLeft}
-                  </span>
+                  <span className={`text-6xl font-bold ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`} style={{ fontFamily: 'Cinzel Decorative, serif' }}>{timeLeft}</span>
                 ) : game.status === 'paused' ? (
-                  <span className="text-3xl text-yellow-400 font-bold">PAUSED</span>
+                  <span className="text-2xl text-yellow-400 font-bold">PAUSED</span>
                 ) : game.status === 'revealing' ? (
-                  <span className="text-2xl text-yellow-400">✨ Reveal</span>
+                  <span className="text-2xl text-yellow-400">✨</span>
                 ) : game.status === 'finished' ? (
-                  <span className="text-2xl text-green-400">🏆 Done!</span>
+                  <span className="text-2xl text-green-400">🏆</span>
                 ) : (
                   <span className="text-2xl text-yellow-400">Ready</span>
                 )}
@@ -288,9 +295,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         <main className="flex-1 flex gap-6 min-h-0">
           {/* Leaderboard */}
           <aside className="w-64 flex flex-col">
-            <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3 flex items-center justify-center gap-2" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-              <span>🏆</span> Leaderboard
-            </h2>
+            <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🏆 Leaderboard</h2>
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {sortedTeams.map((team, index) => {
                 const color = getTeamColor(teams.findIndex(t => t.id === team.id))
@@ -329,7 +334,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                     <button onClick={startGame} className="bg-gradient-to-br from-green-600 to-green-700 text-white text-2xl font-bold py-5 px-10 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform animate-pulse" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🎮 Start! ({teams.length} teams)</button>
                   )}
                 </div>
-                {teams.length === 0 && <p className="text-yellow-300 text-xl animate-pulse mt-6">Waiting for players to join...</p>}
+                {teams.length === 0 && <p className="text-yellow-300 text-xl animate-pulse mt-6">Waiting for players...</p>}
               </div>
             ) : game.status === 'finished' ? (
               <div className="flex-1 flex items-center justify-center">
@@ -345,8 +350,45 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   <button onClick={() => router.push('/')} className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-2xl font-bold py-5 px-10 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🏠 New Game</button>
                 </div>
               </div>
+            ) : revealPhase === 'winners' ? (
+              /* Winners Reveal Screen */
+              <div className="flex-1 flex items-center justify-center animate-fadeIn">
+                <div className="text-center w-full max-w-2xl">
+                  <h2 className="text-5xl font-bold text-yellow-300 mb-8" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
+                    {winners.length > 0 ? '🎉 Correct Answers! 🎉' : '😅 No Correct Answers'}
+                  </h2>
+                  {winners.length > 0 ? (
+                    <div className="space-y-4">
+                      {winners.map((w, idx) => {
+                        const color = getTeamColor(teams.findIndex(t => t.id === w.team.id))
+                        return (
+                          <div 
+                            key={w.team.id} 
+                            className={`bg-gradient-to-br ${color.bg} border-4 ${color.border} rounded-2xl p-5 shadow-xl animate-slideUp`}
+                            style={{ animationDelay: `${idx * 200}ms` }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <span className="text-4xl">
+                                  {w.position === 1 ? '🥇' : w.position === 2 ? '🥈' : w.position === 3 ? '🥉' : `#${w.position}`}
+                                </span>
+                                <span className="text-3xl text-white font-bold" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>{w.team.name}</span>
+                              </div>
+                              <span className="text-3xl text-green-300 font-bold">+{w.points}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-6xl mb-4">🤷</div>
+                  )}
+                  <p className="text-white/60 text-lg mt-8">Next question coming up...</p>
+                </div>
+              </div>
             ) : (
-              <>
+              /* Question/Answer Phase */
+              <div className={`flex-1 flex flex-col transition-opacity duration-500 ${revealPhase === 'answer' ? '' : ''}`}>
                 <div className="text-center mb-3">
                   <span className="inline-block bg-black/40 text-yellow-300 px-6 py-2 rounded-full text-lg">
                     Question {(game.current_question ?? 0) + 1} of {Math.min(settings.totalQuestions, triviaQuestions.length)}
@@ -360,15 +402,15 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                 <div className="grid grid-cols-2 gap-5 flex-1">
                   {currentQ.answers.map((answer, index) => {
                     const colors = [
-                      { bg: 'from-green-600 to-green-700', border: 'border-green-400', icon: '🎄' },
-                      { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400', icon: '❄️' },
-                      { bg: 'from-red-600 to-red-700', border: 'border-red-400', icon: '🎅' },
-                      { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400', icon: '⭐' },
+                      { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
+                      { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400' },
+                      { bg: 'from-red-600 to-red-700', border: 'border-red-400' },
+                      { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400' },
                     ]
                     const isCorrect = index === currentQ.correct
-                    const showCorrect = game.status === 'revealing'
+                    const showCorrect = revealPhase === 'answer'
                     return (
-                      <div key={index} className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-6 flex items-center justify-center shadow-lg transition-all duration-500 ${showCorrect && isCorrect ? 'ring-4 ring-white scale-105 shadow-2xl' : ''} ${showCorrect && !isCorrect ? 'opacity-40 scale-95' : ''}`}>
+                      <div key={index} className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-6 flex items-center justify-center shadow-lg transition-all duration-700 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-95' : ''}`}>
                         <span className="text-3xl font-bold text-white text-center leading-snug" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
                           <span className="text-yellow-200 mr-3 text-4xl">{String.fromCharCode(65 + index)}</span>
                           {answer}
@@ -378,37 +420,29 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                     )
                   })}
                 </div>
-              </>
+              </div>
             )}
           </section>
 
-          {/* Answer Panel */}
-          {game.status !== 'waiting' && game.status !== 'finished' && (
+          {/* Answer Panel - Only show during playing, not during reveal */}
+          {game.status === 'playing' && revealPhase === 'none' && (
             <aside className="w-64 flex flex-col">
-              <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3 flex items-center justify-center gap-2" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-                <span>🔒</span> Locked In
-                <span className="text-white/60 text-lg">({currentAnswers.length}/{teams.length})</span>
+              <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
+                🔒 Locked In <span className="text-white/60 text-lg">({currentAnswers.length}/{teams.length})</span>
               </h2>
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {sortedCurrentAnswers.map((ans, idx) => {
                   const team = teams.find(t => t.id === ans.team_id)
                   if (!team) return null
                   const color = getTeamColor(teams.findIndex(t => t.id === team.id))
-                  const points = revealedPoints[team.id]
                   return (
-                    <div key={ans.id} className={`bg-gradient-to-br ${color.bg} border-2 ${color.border} rounded-xl p-3 shadow-md transition-all`}>
+                    <div key={ans.id} className={`bg-gradient-to-br ${color.bg} border-2 ${color.border} rounded-xl p-3 shadow-md`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="bg-black/30 text-yellow-300 font-bold px-2 py-0.5 rounded text-sm">#{idx + 1}</span>
                           <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
                         </div>
-                        {game.status === 'revealing' ? (
-                          <span className={`font-bold text-lg ${ans.is_correct ? 'text-green-300' : 'text-red-300'}`}>
-                            {ans.is_correct ? `+${points}` : '✗'}
-                          </span>
-                        ) : (
-                          <span className="text-white/50">🔒</span>
-                        )}
+                        <span className="text-white/50">🔒</span>
                       </div>
                     </div>
                   )
@@ -416,16 +450,21 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                 {currentAnswers.length === 0 && (
                   <div className="text-center text-gray-400 py-8">
                     <p className="text-4xl mb-2">🤔</p>
-                    <p>Waiting for answers...</p>
+                    <p>Waiting...</p>
                   </div>
                 )}
                 {currentAnswers.length > 0 && currentAnswers.length < teams.length && (
                   <div className="text-center text-gray-400 py-3 text-sm border-t border-white/10 mt-2">
-                    ⏳ {teams.length - currentAnswers.length} still thinking...
+                    ⏳ {teams.length - currentAnswers.length} thinking...
                   </div>
                 )}
               </div>
             </aside>
+          )}
+          
+          {/* Placeholder for reveal phases to maintain layout */}
+          {(game.status === 'revealing' || revealPhase !== 'none') && game.status !== 'waiting' && game.status !== 'finished' && (
+            <aside className="w-64" />
           )}
         </main>
       </div>
