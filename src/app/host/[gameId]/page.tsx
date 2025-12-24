@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase'
 import { triviaQuestions } from '@/lib/questions'
 import { Game, Team, Answer, getTeamColor, DEFAULT_SETTINGS, REVEAL_TIME_SECONDS } from '@/lib/types'
 
+// Points based on answer order (1st, 2nd, 3rd, etc.)
+const POINTS_BY_ORDER = [300, 250, 200, 175, 150, 125, 100, 100, 100, 100]
+
 export default function HostPage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = use(params)
   const router = useRouter()
@@ -18,6 +21,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [revealedPoints, setRevealedPoints] = useState<Record<string, number>>({})
   
   // Use refs to avoid stale closures in callbacks
   const gameRef = useRef<Game | null>(null)
@@ -25,6 +29,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const answersRef = useRef<Answer[]>([])
   const settingsRef = useRef(DEFAULT_SETTINGS)
   const pausedTimeRef = useRef<number | null>(null)
+  const hasRevealedRef = useRef(false)
 
   // Keep refs in sync
   useEffect(() => { gameRef.current = game }, [game])
@@ -104,14 +109,28 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     }
   }, [gameId])
 
-  // Handle revealing answers and scoring - fetches fresh data to avoid stale closures
+  // Check if all teams have answered - auto-reveal
+  useEffect(() => {
+    if (game?.status !== 'playing' || hasRevealedRef.current) return
+    
+    const currentQuestion = game.current_question ?? 0
+    const currentAnswers = answers.filter(a => a.question_index === currentQuestion)
+    
+    // If all teams have answered, trigger reveal
+    if (teams.length > 0 && currentAnswers.length >= teams.length) {
+      hasRevealedRef.current = true
+      handleReveal()
+    }
+  }, [answers, teams, game?.status, game?.current_question])
+
+  // Handle revealing answers and scoring
   const handleReveal = async () => {
     const currentGame = gameRef.current
     if (!currentGame) return
     
     const currentQuestion = currentGame.current_question ?? 0
     
-    // Fetch fresh answers from database to ensure we have all of them
+    // Fetch fresh answers from database
     const { data: freshAnswers } = await supabase
       .from('answers')
       .select()
@@ -129,45 +148,48 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     
     if (!freshTeams) return
     
-    const correctAnswers = freshAnswers.filter(a => a.is_correct)
+    // Sort all answers by time to determine order
+    const sortedAnswers = [...freshAnswers].sort(
+      (a, b) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime()
+    )
     
-    console.log(`Revealing Q${currentQuestion}: ${freshAnswers.length} answers, ${correctAnswers.length} correct`)
+    // Track correct answer order for points
+    let correctOrderIndex = 0
+    const pointsMap: Record<string, number> = {}
     
     // Award points based on order of correct answers
-    for (let i = 0; i < correctAnswers.length; i++) {
-      const basePoints = 100
-      const speedBonus = Math.max(0, (correctAnswers.length - i) * 25)
-      const points = basePoints + speedBonus
-      
-      // Update answer with points
-      await supabase
-        .from('answers')
-        .update({ points_earned: points })
-        .eq('id', correctAnswers[i].id)
-      
-      // Find team and update score
-      const team = freshTeams.find(t => t.id === correctAnswers[i].team_id)
-      if (team) {
-        const newScore = team.score + points
-        console.log(`Awarding ${points} points to ${team.name}, new score: ${newScore}`)
+    for (const answer of sortedAnswers) {
+      if (answer.is_correct) {
+        const points = POINTS_BY_ORDER[correctOrderIndex] || 100
+        pointsMap[answer.team_id] = points
         
+        // Update answer with points
         await supabase
-          .from('teams')
-          .update({ score: newScore })
-          .eq('id', team.id)
+          .from('answers')
+          .update({ points_earned: points })
+          .eq('id', answer.id)
         
-        // Update local state
-        setTeams(prev => prev.map(t => 
-          t.id === team.id ? { ...t, score: newScore } : t
-        ))
+        // Find team and update score
+        const team = freshTeams.find(t => t.id === answer.team_id)
+        if (team) {
+          const newScore = team.score + points
+          await supabase
+            .from('teams')
+            .update({ score: newScore })
+            .eq('id', team.id)
+          
+          // Update local state
+          setTeams(prev => prev.map(t => 
+            t.id === team.id ? { ...t, score: newScore } : t
+          ))
+        }
+        
+        correctOrderIndex++
       }
     }
     
-    // Update local answers state
-    setAnswers(prev => prev.map(a => {
-      const updated = freshAnswers.find(fa => fa.id === a.id)
-      return updated ? { ...a, points_earned: updated.points_earned } : a
-    }))
+    // Store revealed points for display
+    setRevealedPoints(pointsMap)
     
     // Update game status to revealing
     await supabase
@@ -183,14 +205,17 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     }, REVEAL_TIME_SECONDS * 1000)
   }
 
-  // Timer logic - uses ref for settings to get current value
+  // Timer logic
   useEffect(() => {
     if (game?.status !== 'playing') return
     
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          handleReveal()
+          if (!hasRevealedRef.current) {
+            hasRevealedRef.current = true
+            handleReveal()
+          }
           return 0
         }
         return prev - 1
@@ -201,7 +226,6 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   }, [game?.status, gameId])
 
   const saveSettings = async () => {
-    // Save to database
     await supabase
       .from('games')
       .update({
@@ -210,14 +234,12 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       })
       .eq('id', gameId)
     
-    // Update local game state
     setGame(prev => prev ? {
       ...prev,
       question_time_seconds: settings.questionTime,
       total_questions: settings.totalQuestions,
     } : null)
     
-    // If paused and we have remaining time greater than new setting, cap it
     if (pausedTimeRef.current !== null && pausedTimeRef.current > settings.questionTime) {
       pausedTimeRef.current = settings.questionTime
     }
@@ -230,6 +252,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
 
   const startGame = async () => {
     if (teams.length < 1) return
+    
+    hasRevealedRef.current = false
     
     await supabase
       .from('games')
@@ -255,6 +279,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       total_questions: settings.totalQuestions,
     } : null)
     setTimeLeft(settings.questionTime)
+    setRevealedPoints({})
   }
 
   const pauseGame = async () => {
@@ -270,7 +295,6 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   }
 
   const resumeGame = async () => {
-    // Use paused time, but cap at current settings
     const resumeTime = Math.min(
       pausedTimeRef.current ?? settings.questionTime, 
       settings.questionTime
@@ -312,6 +336,10 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     const totalQ = currentSettings.totalQuestions
     const nextQ = (currentGame?.current_question ?? 0) + 1
     
+    // Reset reveal flag for next question
+    hasRevealedRef.current = false
+    setRevealedPoints({})
+    
     if (nextQ >= Math.min(totalQ, triviaQuestions.length)) {
       await supabase
         .from('games')
@@ -346,7 +374,6 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       question_time_seconds: currentSettings.questionTime,
     } : null)
     
-    // Use current settings for new question timer
     setTimeLeft(currentSettings.questionTime)
   }
 
@@ -355,6 +382,11 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const joinUrl = `${hostUrl}/play/${gameId}`
   const sortedTeams = [...teams].sort((a, b) => b.score - a.score)
   const totalQuestions = settings.totalQuestions
+  
+  // Get answers sorted by time for the response panel
+  const sortedCurrentAnswers = [...currentAnswers].sort(
+    (a, b) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime()
+  )
 
   if (!game) {
     return (
@@ -464,11 +496,14 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                 </div>
               </div>
               
-              <p className="text-gray-300 text-sm text-center">
-                ⚠️ New time will apply to the next question
-              </p>
+              <div className="bg-black/30 p-3 rounded-lg">
+                <p className="text-yellow-300 text-sm font-bold mb-1">🏆 Points System</p>
+                <p className="text-gray-300 text-xs">
+                  1st correct: 300 pts • 2nd: 250 • 3rd: 200 • 4th: 175 • 5th: 150...
+                </p>
+              </div>
               
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4 pt-2">
                 <button
                   onClick={() => {
                     setShowSettings(false)
@@ -555,41 +590,28 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
 
         {/* Main Content */}
         <div className="flex-1 flex gap-4 min-h-0">
-          {/* Left Side - Teams */}
+          {/* Left Side - Leaderboard */}
           <div className="w-56 flex flex-col gap-2 overflow-y-auto">
             <h2 className="text-xl text-yellow-300 text-center font-bold" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-              Teams ({teams.length})
+              Leaderboard
             </h2>
             {sortedTeams.map((team, index) => {
               const color = getTeamColor(teams.findIndex(t => t.id === team.id))
-              const hasAnswered = currentAnswers.some(a => a.team_id === team.id)
-              const teamAnswer = currentAnswers.find(a => a.team_id === team.id)
               
               return (
                 <div
                   key={team.id}
-                  className={`bg-gradient-to-br ${color.bg} border-3 ${color.border} rounded-xl p-3
-                    transition-all duration-300 ${hasAnswered ? 'ring-2 ring-white scale-102' : ''}`}
+                  className={`bg-gradient-to-br ${color.bg} border-3 ${color.border} rounded-xl p-3`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {index === 0 && game.status !== 'waiting' && <span className="text-lg">👑</span>}
-                      <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
+                      {index === 1 && game.status !== 'waiting' && <span className="text-lg">🥈</span>}
+                      {index === 2 && game.status !== 'waiting' && <span className="text-lg">🥉</span>}
+                      <span className="text-white font-bold truncate max-w-[90px]">{team.name}</span>
                     </div>
                     <span className="text-yellow-300 font-bold text-xl">{team.score}</span>
                   </div>
-                  {game.status === 'revealing' && teamAnswer && (
-                    <div className="text-sm mt-1">
-                      {teamAnswer.is_correct ? (
-                        <span className="text-green-300">✓ +{teamAnswer.points_earned || '?'}</span>
-                      ) : (
-                        <span className="text-red-300">✗</span>
-                      )}
-                    </div>
-                  )}
-                  {game.status === 'playing' && hasAnswered && (
-                    <div className="text-sm text-white/80 mt-1">✓ Answered</div>
-                  )}
                 </div>
               )
             })}
@@ -684,7 +706,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   </span>
                 </div>
 
-                {/* Question - LARGER */}
+                {/* Question */}
                 <div className="question-banner p-6 rounded-xl mb-4">
                   <p 
                     className="text-4xl text-white text-center font-semibold leading-tight"
@@ -694,7 +716,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   </p>
                 </div>
 
-                {/* Answers Grid - BIGGER */}
+                {/* Answers Grid */}
                 <div className="grid grid-cols-2 gap-4 flex-1">
                   {currentQ.answers.map((answer, index) => {
                     const colors = [
@@ -731,37 +753,54 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
             )}
           </div>
 
-          {/* Right Side - Response Status */}
+          {/* Right Side - Answers as they come in */}
           {game.status !== 'waiting' && game.status !== 'finished' && (
-            <div className="w-48">
-              <h2 className="text-xl text-yellow-300 text-center mb-2 font-bold" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-                Responses
+            <div className="w-56 flex flex-col gap-2 overflow-y-auto">
+              <h2 className="text-xl text-yellow-300 text-center font-bold" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
+                Locked In ({currentAnswers.length}/{teams.length})
               </h2>
-              <div className="question-banner p-4 rounded-xl">
-                <div className="text-center">
-                  <p className="text-6xl font-bold text-white">{currentAnswers.length}</p>
-                  <p className="text-yellow-300 text-lg">of {teams.length}</p>
-                </div>
-                {currentAnswers.length > 0 && (
-                  <div className="mt-4 space-y-1">
-                    {currentAnswers
-                      .sort((a, b) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime())
-                      .slice(0, 8)
-                      .map((ans, idx) => {
-                        const team = teams.find(t => t.id === ans.team_id)
-                        return (
-                          <div key={ans.id} className="text-white text-sm flex items-center gap-2">
-                            <span className="text-yellow-300 font-bold">#{idx + 1}</span>
-                            <span className="truncate">{team?.name}</span>
-                          </div>
-                        )
-                      })}
-                    {currentAnswers.length > 8 && (
-                      <p className="text-gray-400 text-xs">+{currentAnswers.length - 8} more</p>
-                    )}
+              
+              {sortedCurrentAnswers.map((ans, idx) => {
+                const team = teams.find(t => t.id === ans.team_id)
+                if (!team) return null
+                const color = getTeamColor(teams.findIndex(t => t.id === team.id))
+                const points = revealedPoints[team.id]
+                
+                return (
+                  <div
+                    key={ans.id}
+                    className={`bg-gradient-to-br ${color.bg} border-3 ${color.border} rounded-xl p-3
+                      transition-all duration-300 animate-[slideIn_0.3s_ease-out]`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-300 font-bold">#{idx + 1}</span>
+                        <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
+                      </div>
+                      {game.status === 'revealing' && (
+                        <span className={`font-bold ${ans.is_correct ? 'text-green-300' : 'text-red-300'}`}>
+                          {ans.is_correct ? `+${points}` : '✗'}
+                        </span>
+                      )}
+                      {game.status === 'playing' && (
+                        <span className="text-white/70">🔒</span>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                )
+              })}
+              
+              {currentAnswers.length === 0 && (
+                <div className="text-center text-gray-400 py-4">
+                  <p className="text-lg">Waiting for answers...</p>
+                </div>
+              )}
+              
+              {currentAnswers.length > 0 && currentAnswers.length < teams.length && (
+                <div className="text-center text-gray-400 py-2 text-sm">
+                  {teams.length - currentAnswers.length} still thinking...
+                </div>
+              )}
             </div>
           )}
         </div>
