@@ -222,7 +222,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   }
 
   return (
-    <div className="min-h-[100dvh] wood-background relative overflow-hidden">
+    <div className="h-[100dvh] wood-background relative overflow-hidden">
       <div className="absolute top-16 left-8 text-6xl opacity-20 animate-pulse">🎄</div>
       <div className="absolute top-16 right-8 text-6xl opacity-20 animate-pulse" style={{animationDelay: '1s'}}>🎄</div>
       <div className="absolute bottom-8 left-12 text-5xl opacity-15">🎁</div>
@@ -270,8 +270,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col min-h-[100dvh] p-4 lg:p-6 xl:p-8 safe-area-inset">
-        <div className="w-full max-w-[1680px] mx-auto flex flex-col min-h-[100dvh]">
+      <div className="relative z-10 flex flex-col h-full p-4 lg:p-6 xl:p-8 safe-area-inset overflow-hidden">
+        <div className="w-full max-w-[1680px] mx-auto flex flex-col h-full overflow-hidden">
         {/* Header */}
         <header className="flex items-center justify-between gap-4 mb-4 lg:mb-6">
           {/* Only show game code on waiting screen or first question */}
@@ -314,7 +314,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[320px,1fr,320px] xl:grid-cols-[360px,1fr,360px] gap-4 lg:gap-6 min-h-0">
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[320px,1fr,320px] xl:grid-cols-[360px,1fr,360px] gap-4 lg:gap-6 min-h-0 overflow-hidden">
           {/* Leaderboard */}
           <aside className="hidden lg:flex flex-col min-h-0">
             <div className="festive-surface rounded-2xl p-4">
@@ -341,7 +341,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
           </aside>
 
           {/* Center Content */}
-          <section className="flex-1 flex flex-col min-h-0">
+          <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {game.status === 'waiting' ? (
               <div className="flex-1 flex flex-col items-center justify-center">
                 <div className="question-banner p-8 lg:p-10 rounded-3xl text-center shadow-2xl mb-8 w-full max-w-3xl">
@@ -422,7 +422,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
               </div>
             ) : (
               /* Question/Answer Phase */
-              <div className={`flex-1 flex flex-col transition-opacity duration-500 ${revealPhase === 'answer' ? '' : ''}`}>
+              <div className={`flex-1 flex flex-col min-h-0 transition-opacity duration-500 ${revealPhase === 'answer' ? '' : ''}`}>
                 <div className="text-center mb-3">
                   <span className="inline-block bg-black/40 text-yellow-300 px-6 py-2 rounded-full text-lg">
                     Question {(game.current_question ?? 0) + 1} of {Math.min(settings.totalQuestions, triviaQuestions.length)}
@@ -435,7 +435,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5 flex-1 min-h-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 grid-rows-4 sm:grid-rows-2 gap-4 lg:gap-5 flex-1 min-h-0 overflow-hidden">
                   {currentQ.answers.map((answer, index) => {
                     const colors = [
                       { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
@@ -448,7 +448,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                     return (
                       <div
                         key={index}
-                        className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-5 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 min-h-[120px] lg:min-h-[160px] ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-[1.02] lg:scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-[0.99] lg:scale-95' : ''}`}
+                        className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-4 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 min-h-0 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-[1.02] lg:scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-[0.99] lg:scale-95' : ''}`}
                       >
                         <span className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white text-center leading-snug festive-title">
                           <span className="text-yellow-200 mr-3 text-3xl lg:text-4xl xl:text-5xl">{String.fromCharCode(65 + index)}</span>

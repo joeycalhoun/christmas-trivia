@@ -112,10 +112,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Waiting screen
   if (game.status === 'waiting') {
     return (
-      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+      <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
         <SoftChristmasLights />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
-        <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center p-6">
+        <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 overflow-hidden">
           <div className="question-banner p-9 rounded-3xl text-center w-full max-w-sm shadow-2xl">
             <div className="text-7xl mb-4">✅</div>
             <h1 className="text-4xl font-bold text-white mb-4 festive-title">You&apos;re In!</h1>
@@ -137,10 +137,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Game finished screen
   if (game.status === 'finished') {
     return (
-      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+      <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
         <SoftChristmasLights />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
-        <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center p-6">
+        <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 overflow-hidden">
           <div className="question-banner p-9 rounded-3xl text-center w-full max-w-sm shadow-2xl">
             <div className="text-7xl mb-4">🎉</div>
             <h1 className="text-4xl font-bold text-yellow-300 mb-4 festive-title">Game Over!</h1>
@@ -159,10 +159,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Paused screen
   if (game.status === 'paused') {
     return (
-      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+      <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
         <SoftChristmasLights />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
-        <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center p-6">
+        <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 overflow-hidden">
           <div className="question-banner p-9 rounded-3xl text-center w-full max-w-sm shadow-2xl">
             <div className="text-7xl mb-4">⏸️</div>
             <h1 className="text-4xl font-bold text-yellow-300 mb-4 festive-title">Paused</h1>
@@ -185,10 +185,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     const pointsEarned = myAnswer?.points_earned || 0
     
     return (
-      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+      <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
         <SoftChristmasLights />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
-        <div className="relative z-10 min-h-[100dvh] flex flex-col">
+        <div className="relative z-10 h-full flex flex-col overflow-hidden">
           <header className="p-4">
             <div className="festive-surface rounded-2xl px-4 py-3 flex items-center justify-between">
               <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} rounded-xl px-4 py-2 shadow-md`}>
@@ -234,10 +234,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
 
   // Playing screen
   return (
-    <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+    <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
       <SoftChristmasLights />
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
-      <div className="relative z-10 min-h-[100dvh] flex flex-col">
+      <div className="relative z-10 h-full flex flex-col overflow-hidden">
         <header className="p-4">
           <div className="festive-surface rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
             <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} rounded-xl px-4 py-2 shadow-md`}>
@@ -254,17 +254,17 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
 
         <div className="px-4 pt-1 pb-3">
           <div className="w-full max-w-md mx-auto">
-            <div className="question-banner p-5 rounded-2xl shadow-lg">
+            <div className="question-banner p-4 rounded-2xl shadow-lg">
               <p className="text-yellow-300/80 text-sm text-center mb-2">
                 Q{(game.current_question ?? 0) + 1} / {Math.min(totalQuestions, triviaQuestions.length)}
               </p>
-              <p className="text-2xl text-white text-center font-bold leading-snug festive-title">{currentQ.question}</p>
+              <p className="text-xl sm:text-2xl text-white text-center font-bold leading-snug festive-title">{currentQ.question}</p>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col px-4 pb-4">
-          <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col px-4 pb-4 min-h-0 overflow-hidden">
+          <div className="w-full max-w-md mx-auto flex-1 flex flex-col min-h-0 overflow-hidden">
             {hasAnswered ? (
               /* Waiting for reveal - no feedback yet */
               <div className="flex-1 flex items-center justify-center">
@@ -281,7 +281,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
               </div>
             ) : (
               /* Answer Buttons */
-              <div className="flex-1 flex flex-col gap-4">
+              <div className="grid grid-rows-4 gap-3 flex-1 min-h-0 overflow-hidden">
                 {currentQ.answers.map((answer, index) => {
                   const colors = [
                     { bg: 'from-green-500 to-green-600', border: 'border-green-400', active: 'active:from-green-400' },
@@ -294,10 +294,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
                       key={index}
                       onClick={() => submitAnswer(index)}
                       disabled={hasAnswered || timeLeft === 0}
-                      className={`btn-festive flex-1 min-h-[88px] bg-gradient-to-br ${colors[index].bg} ${colors[index].border} ${colors[index].active} border-4 rounded-2xl px-5 py-4 text-left active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center shadow-lg`}
+                      className={`btn-festive h-full min-h-0 bg-gradient-to-br ${colors[index].bg} ${colors[index].border} ${colors[index].active} border-4 rounded-2xl px-5 py-3 text-left active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center shadow-lg`}
                     >
                       <span className="text-yellow-200 font-bold text-2xl mr-4">{String.fromCharCode(65 + index)}</span>
-                      <span className="text-white font-bold text-xl leading-snug festive-title">{answer}</span>
+                      <span className="text-white font-bold text-lg sm:text-xl leading-snug festive-title">{answer}</span>
                     </button>
                   )
                 })}
@@ -332,10 +332,10 @@ function JoinScreen({ game, teamName, setTeamName, selectedColor, setSelectedCol
   joinGame: () => void
 }) {
   return (
-    <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+    <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
       <SoftChristmasLights />
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
-      <div className="relative z-10 min-h-[100dvh] flex flex-col">
+      <div className="relative z-10 h-full flex flex-col overflow-hidden">
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="question-banner p-8 rounded-3xl w-full max-w-sm shadow-2xl">
             <div className="text-center mb-6">
