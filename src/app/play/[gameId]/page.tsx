@@ -112,18 +112,22 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Waiting screen
   if (game.status === 'waiting') {
     return (
-      <div className="min-h-[100dvh] wood-background flex flex-col items-center justify-center p-6 safe-area-inset">
-        <div className="question-banner p-10 rounded-3xl text-center w-full max-w-sm shadow-2xl">
-          <div className="text-7xl mb-4">✅</div>
-          <h1 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>You&apos;re In!</h1>
-          <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} rounded-2xl p-5 mb-6 shadow-lg`}>
-            <p className="text-2xl text-white font-bold">{team.name}</p>
-          </div>
-          <div className="flex items-center justify-center gap-2 text-yellow-300">
-            <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0s'}} />
-            <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
-            <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.4s'}} />
-            <span className="ml-2">Waiting for host</span>
+      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+        <SoftChristmasLights />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+        <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center p-6">
+          <div className="question-banner p-9 rounded-3xl text-center w-full max-w-sm shadow-2xl">
+            <div className="text-7xl mb-4">✅</div>
+            <h1 className="text-4xl font-bold text-white mb-4 festive-title">You&apos;re In!</h1>
+            <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} rounded-2xl p-5 mb-6 shadow-lg`}>
+              <p className="text-2xl text-white font-bold">{team.name}</p>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-yellow-300">
+              <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0s'}} />
+              <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+              <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.4s'}} />
+              <span className="ml-2">Waiting for host</span>
+            </div>
           </div>
         </div>
       </div>
@@ -133,16 +137,20 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Game finished screen
   if (game.status === 'finished') {
     return (
-      <div className="min-h-[100dvh] wood-background flex flex-col items-center justify-center p-6 safe-area-inset">
-        <div className="question-banner p-10 rounded-3xl text-center w-full max-w-sm shadow-2xl">
-          <div className="text-7xl mb-4">🎉</div>
-          <h1 className="text-4xl font-bold text-yellow-300 mb-4" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Game Over!</h1>
-          <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} rounded-2xl p-5 mb-6 shadow-lg`}>
-            <p className="text-xl text-white font-bold">{team.name}</p>
-            <p className="text-5xl text-yellow-300 font-bold mt-2">{team.score}</p>
-            <p className="text-white/60 text-sm">points</p>
+      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+        <SoftChristmasLights />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+        <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center p-6">
+          <div className="question-banner p-9 rounded-3xl text-center w-full max-w-sm shadow-2xl">
+            <div className="text-7xl mb-4">🎉</div>
+            <h1 className="text-4xl font-bold text-yellow-300 mb-4 festive-title">Game Over!</h1>
+            <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} rounded-2xl p-5 mb-6 shadow-lg`}>
+              <p className="text-xl text-white font-bold">{team.name}</p>
+              <p className="text-5xl text-yellow-300 font-bold mt-2">{team.score}</p>
+              <p className="text-white/60 text-sm">points</p>
+            </div>
+            <button onClick={() => router.push('/')} className="btn-festive w-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xl font-bold py-4 rounded-xl border-4 border-yellow-400 shadow-lg active:scale-95 transition-transform festive-title">🏠 Play Again</button>
           </div>
-          <button onClick={() => router.push('/')} className="w-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xl font-bold py-4 rounded-xl border-4 border-yellow-400 shadow-lg active:scale-95 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🏠 Play Again</button>
         </div>
       </div>
     )
@@ -151,17 +159,21 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Paused screen
   if (game.status === 'paused') {
     return (
-      <div className="min-h-[100dvh] wood-background flex flex-col items-center justify-center p-6 safe-area-inset">
-        <div className="question-banner p-10 rounded-3xl text-center w-full max-w-sm shadow-2xl">
-          <div className="text-7xl mb-4">⏸️</div>
-          <h1 className="text-4xl font-bold text-yellow-300 mb-4" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Paused</h1>
-          <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} rounded-2xl p-4 mb-6`}>
-            <div className="flex justify-between items-center">
-              <span className="text-white font-bold">{team.name}</span>
-              <span className="text-yellow-300 font-bold text-xl">{team.score} pts</span>
+      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+        <SoftChristmasLights />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+        <div className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center p-6">
+          <div className="question-banner p-9 rounded-3xl text-center w-full max-w-sm shadow-2xl">
+            <div className="text-7xl mb-4">⏸️</div>
+            <h1 className="text-4xl font-bold text-yellow-300 mb-4 festive-title">Paused</h1>
+            <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} rounded-2xl p-4 mb-6`}>
+              <div className="flex justify-between items-center">
+                <span className="text-white font-bold">{team.name}</span>
+                <span className="text-yellow-300 font-bold text-xl">{team.score} pts</span>
+              </div>
             </div>
+            <p className="text-white/70 text-lg animate-pulse">Waiting for host...</p>
           </div>
-          <p className="text-white/70 text-lg animate-pulse">Waiting for host...</p>
         </div>
       </div>
     )
@@ -173,21 +185,26 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     const pointsEarned = myAnswer?.points_earned || 0
     
     return (
-      <div className="min-h-[100dvh] wood-background flex flex-col safe-area-inset">
-        <header className="flex justify-between items-center p-4 bg-black/30 backdrop-blur-sm">
-          <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} rounded-xl px-4 py-2 shadow-md`}>
-            <div className="flex items-center gap-3">
-              <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
-              <span className="text-yellow-300 font-bold text-lg">{team.score}</span>
+      <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+        <SoftChristmasLights />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+        <div className="relative z-10 min-h-[100dvh] flex flex-col">
+          <header className="p-4">
+            <div className="festive-surface rounded-2xl px-4 py-3 flex items-center justify-between">
+              <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} rounded-xl px-4 py-2 shadow-md`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-white font-bold truncate max-w-[120px]">{team.name}</span>
+                  <span className="text-yellow-300 font-bold text-lg">{team.score}</span>
+                </div>
+              </div>
+              <div className="px-4 py-2 rounded-xl font-bold text-lg bg-yellow-500/20 text-yellow-300">
+                ✨ Reveal
+              </div>
             </div>
-          </div>
-          <div className="px-5 py-2 rounded-xl font-bold text-xl bg-yellow-500/20 text-yellow-300">
-            ✨ Reveal
-          </div>
-        </header>
+          </header>
 
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center">
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center max-w-md w-full">
             {hasAnswered ? (
               <>
                 <div className={`text-9xl mb-6 ${wasCorrect ? 'animate-bounce' : 'animate-pulse'}`}>
@@ -208,6 +225,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
                 <p className="text-white text-xl">Answer: <span className="text-green-400 font-bold">{currentQ.answers[currentQ.correct]}</span></p>
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
@@ -216,62 +234,77 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
 
   // Playing screen
   return (
-    <div className="min-h-[100dvh] wood-background flex flex-col safe-area-inset">
-      <header className="flex justify-between items-center p-4 bg-black/30 backdrop-blur-sm">
-        <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} rounded-xl px-4 py-2 shadow-md`}>
-          <div className="flex items-center gap-3">
-            <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
-            <span className="text-yellow-300 font-bold text-lg">{team.score}</span>
-          </div>
-        </div>
-        <div className={`px-5 py-2 rounded-xl font-bold text-2xl ${timeLeft <= 5 && !hasAnswered ? 'bg-red-600 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
-          {timeLeft}
-        </div>
-      </header>
-
-      <div className="px-4 pt-4 pb-3">
-        <div className="question-banner p-5 rounded-2xl shadow-lg">
-          <p className="text-yellow-300/80 text-sm text-center mb-2">
-            Q{(game.current_question ?? 0) + 1} / {Math.min(totalQuestions, triviaQuestions.length)}
-          </p>
-          <p className="text-2xl text-white text-center font-bold leading-snug" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>{currentQ.question}</p>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col px-4 pb-4">
-        {hasAnswered ? (
-          /* Waiting for reveal - no feedback yet */
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-8xl mb-6 animate-pulse">🔒</div>
-              <p className="text-3xl font-bold text-yellow-300 mb-2" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Answer Locked!</p>
-              <p className="text-white/60 text-lg">Waiting for everyone...</p>
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0s'}} />
-                <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
-                <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.4s'}} />
+    <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+      <SoftChristmasLights />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+      <div className="relative z-10 min-h-[100dvh] flex flex-col">
+        <header className="p-4">
+          <div className="festive-surface rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} rounded-xl px-4 py-2 shadow-md`}>
+              <div className="flex items-center gap-3">
+                <span className="text-white font-bold truncate max-w-[140px]">{team.name}</span>
+                <span className="text-yellow-300 font-bold text-lg">{team.score}</span>
               </div>
             </div>
+            <div className={`px-5 py-2 rounded-xl font-bold text-2xl ${timeLeft <= 5 && !hasAnswered ? 'bg-red-600 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
+              {timeLeft}
+            </div>
           </div>
-        ) : (
-          /* Answer Buttons */
-          <div className="flex-1 flex flex-col gap-3">
-            {currentQ.answers.map((answer, index) => {
-              const colors = [
-                { bg: 'from-green-500 to-green-600', border: 'border-green-400', active: 'active:from-green-400' },
-                { bg: 'from-blue-500 to-blue-600', border: 'border-blue-400', active: 'active:from-blue-400' },
-                { bg: 'from-red-500 to-red-600', border: 'border-red-400', active: 'active:from-red-400' },
-                { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400', active: 'active:from-yellow-400' },
-              ]
-              return (
-                <button key={index} onClick={() => submitAnswer(index)} disabled={hasAnswered || timeLeft === 0} className={`flex-1 min-h-[80px] bg-gradient-to-br ${colors[index].bg} ${colors[index].border} ${colors[index].active} border-4 rounded-2xl px-5 py-4 text-left active:scale-[0.98] transition-transform touch-manipulation disabled:opacity-50 flex items-center shadow-lg`}>
-                  <span className="text-yellow-200 font-bold text-2xl mr-4">{String.fromCharCode(65 + index)}</span>
-                  <span className="text-white font-bold text-xl leading-snug" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>{answer}</span>
-                </button>
-              )
-            })}
+        </header>
+
+        <div className="px-4 pt-1 pb-3">
+          <div className="w-full max-w-md mx-auto">
+            <div className="question-banner p-5 rounded-2xl shadow-lg">
+              <p className="text-yellow-300/80 text-sm text-center mb-2">
+                Q{(game.current_question ?? 0) + 1} / {Math.min(totalQuestions, triviaQuestions.length)}
+              </p>
+              <p className="text-2xl text-white text-center font-bold leading-snug festive-title">{currentQ.question}</p>
+            </div>
           </div>
-        )}
+        </div>
+
+        <div className="flex-1 flex flex-col px-4 pb-4">
+          <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+            {hasAnswered ? (
+              /* Waiting for reveal - no feedback yet */
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-8xl mb-6 animate-pulse">🔒</div>
+                  <p className="text-3xl font-bold text-yellow-300 mb-2 festive-title">Answer Locked!</p>
+                  <p className="text-white/60 text-lg">Waiting for everyone...</p>
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0s'}} />
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.4s'}} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Answer Buttons */
+              <div className="flex-1 flex flex-col gap-4">
+                {currentQ.answers.map((answer, index) => {
+                  const colors = [
+                    { bg: 'from-green-500 to-green-600', border: 'border-green-400', active: 'active:from-green-400' },
+                    { bg: 'from-blue-500 to-blue-600', border: 'border-blue-400', active: 'active:from-blue-400' },
+                    { bg: 'from-red-500 to-red-600', border: 'border-red-400', active: 'active:from-red-400' },
+                    { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400', active: 'active:from-yellow-400' },
+                  ]
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => submitAnswer(index)}
+                      disabled={hasAnswered || timeLeft === 0}
+                      className={`btn-festive flex-1 min-h-[88px] bg-gradient-to-br ${colors[index].bg} ${colors[index].border} ${colors[index].active} border-4 rounded-2xl px-5 py-4 text-left active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center shadow-lg`}
+                    >
+                      <span className="text-yellow-200 font-bold text-2xl mr-4">{String.fromCharCode(65 + index)}</span>
+                      <span className="text-white font-bold text-xl leading-snug festive-title">{answer}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -299,45 +332,76 @@ function JoinScreen({ game, teamName, setTeamName, selectedColor, setSelectedCol
   joinGame: () => void
 }) {
   return (
-    <div className="min-h-[100dvh] wood-background flex flex-col safe-area-inset">
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="question-banner p-8 rounded-3xl w-full max-w-sm shadow-2xl">
-          <div className="text-center mb-6">
-            <span className="text-6xl">🎄</span>
-            <h1 className="text-4xl font-bold text-white mt-2" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Join Game</h1>
-          </div>
-          
-          <div className="text-center mb-6">
-            <p className="text-yellow-300/80 text-xs uppercase tracking-wider mb-1">Game Code</p>
-            <p className="text-2xl font-bold text-white tracking-[0.15em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
-          </div>
-          
-          <div className="mb-5">
-            <label className="text-yellow-300 text-sm mb-2 block font-medium">Team Name</label>
-            <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Enter your team name" maxLength={20} className="w-full text-xl py-4 px-5 rounded-xl bg-black/40 text-white border-2 border-yellow-400/50 placeholder-white/40 focus:border-yellow-400 focus:outline-none transition-colors" autoFocus autoComplete="off" autoCapitalize="words" />
-          </div>
-          
-          <div className="mb-6">
-            <label className="text-yellow-300 text-sm mb-3 block font-medium">Team Color</label>
-            <div className="flex flex-wrap gap-3 justify-center">
-              {TEAM_COLORS.map((color, index) => (
-                <button 
-                  key={color.name} 
-                  onClick={() => setSelectedColor(index)} 
-                  className={`w-12 h-12 rounded-full border-4 transition-all active:scale-90 ${selectedColor === index ? 'scale-110 border-white shadow-lg shadow-white/30' : 'border-transparent'}`}
-                  style={{ background: `linear-gradient(to bottom right, ${color.hex[0]}, ${color.hex[1]})` }}
-                />
-              ))}
+    <div className="min-h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+      <SoftChristmasLights />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+      <div className="relative z-10 min-h-[100dvh] flex flex-col">
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="question-banner p-8 rounded-3xl w-full max-w-sm shadow-2xl">
+            <div className="text-center mb-6">
+              <span className="text-6xl">🎄</span>
+              <h1 className="text-4xl font-bold text-white mt-2 festive-title">Join Game</h1>
             </div>
+            
+            <div className="text-center mb-6">
+              <p className="text-yellow-300/80 text-xs uppercase tracking-wider mb-1">Game Code</p>
+              <p className="text-2xl font-bold text-white tracking-[0.15em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
+            </div>
+            
+            <div className="mb-5">
+              <label className="text-yellow-300 text-sm mb-2 block font-medium">Team Name</label>
+              <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Enter your team name" maxLength={20} className="w-full text-xl py-4 px-5 rounded-xl bg-black/40 text-white border-2 border-yellow-400/50 placeholder-white/40 focus:border-yellow-400 focus:outline-none transition-colors" autoFocus autoComplete="off" autoCapitalize="words" />
+            </div>
+            
+            <div className="mb-6">
+              <label className="text-yellow-300 text-sm mb-3 block font-medium">Team Color</label>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {TEAM_COLORS.map((color, index) => (
+                  <button 
+                    key={color.name} 
+                    onClick={() => setSelectedColor(index)} 
+                    className={`btn-festive w-12 h-12 rounded-full border-4 transition-all active:scale-90 ${selectedColor === index ? 'scale-110 border-white shadow-lg shadow-white/30' : 'border-transparent'}`}
+                    style={{ background: `linear-gradient(to bottom right, ${color.hex[0]}, ${color.hex[1]})` }}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {error && <div className="mb-4 text-red-400 text-center text-sm bg-red-900/30 py-2 px-4 rounded-lg">{error}</div>}
+            
+            <button onClick={joinGame} disabled={isJoining || !teamName.trim()} className="btn-festive w-full bg-gradient-to-br from-green-500 to-green-600 text-white text-2xl font-bold py-5 rounded-xl border-4 border-yellow-400 shadow-lg active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed festive-title">
+              {isJoining ? '🎄 Joining...' : '🎮 Join Game!'}
+            </button>
           </div>
-          
-          {error && <div className="mb-4 text-red-400 text-center text-sm bg-red-900/30 py-2 px-4 rounded-lg">{error}</div>}
-          
-          <button onClick={joinGame} disabled={isJoining || !teamName.trim()} className="w-full bg-gradient-to-br from-green-500 to-green-600 text-white text-2xl font-bold py-5 rounded-xl border-4 border-yellow-400 shadow-lg active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-            {isJoining ? '🎄 Joining...' : '🎮 Join Game!'}
-          </button>
         </div>
       </div>
     </div>
+  )
+}
+
+function SoftChristmasLights() {
+  return (
+    <>
+      <div className="christmas-lights-soft">
+        <div className="light-wire" />
+        {Array.from({ length: 28 }).map((_, i) => (
+          <div
+            key={i}
+            className={`light-bulb ${['light-red', 'light-green', 'light-gold', 'light-blue', 'light-purple'][i % 5]}`}
+            style={{ left: `${2 + i * 3.4}%`, animationDelay: `${i * 0.12}s` }}
+          />
+        ))}
+      </div>
+      <div className="christmas-lights-soft-bottom">
+        <div className="light-wire-bottom" />
+        {Array.from({ length: 28 }).map((_, i) => (
+          <div
+            key={i}
+            className={`light-bulb-bottom ${['light-purple', 'light-blue', 'light-gold', 'light-green', 'light-red'][i % 5]}`}
+            style={{ left: `${2 + i * 3.4}%`, animationDelay: `${i * 0.12 + 0.5}s` }}
+          />
+        ))}
+      </div>
+    </>
   )
 }

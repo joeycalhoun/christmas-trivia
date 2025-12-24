@@ -211,14 +211,23 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const sortedTeams = [...teams].sort((a, b) => b.score - a.score)
   const sortedCurrentAnswers = [...currentAnswers].sort((a, b) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime())
 
-  if (!game) return <div className="min-h-screen wood-background flex items-center justify-center"><div className="text-white text-2xl">Loading...</div></div>
+  if (!game) {
+    return (
+      <div className="min-h-[100dvh] wood-background flex items-center justify-center">
+        <div className="festive-surface rounded-2xl px-8 py-6">
+          <div className="text-white text-2xl festive-title">Loading…</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen wood-background relative overflow-hidden">
+    <div className="min-h-[100dvh] wood-background relative overflow-hidden">
       <div className="absolute top-16 left-8 text-6xl opacity-20 animate-pulse">🎄</div>
       <div className="absolute top-16 right-8 text-6xl opacity-20 animate-pulse" style={{animationDelay: '1s'}}>🎄</div>
       <div className="absolute bottom-8 left-12 text-5xl opacity-15">🎁</div>
       <div className="absolute bottom-8 right-12 text-5xl opacity-15">🎁</div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
       
       <ChristmasLights />
 
@@ -261,22 +270,30 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col h-screen p-6">
+      <div className="relative z-10 flex flex-col min-h-[100dvh] p-4 lg:p-6 xl:p-8 safe-area-inset">
+        <div className="w-full max-w-[1680px] mx-auto flex flex-col min-h-[100dvh]">
         {/* Header */}
-        <header className="flex justify-between items-center mb-4">
+        <header className="flex items-center justify-between gap-4 mb-4 lg:mb-6">
           {/* Only show game code on waiting screen or first question */}
           {(game.status === 'waiting' || (game.current_question ?? 0) === 0) ? (
-            <div className="question-banner px-6 py-3 rounded-xl shadow-lg">
+            <div className="question-banner px-5 py-3 rounded-xl shadow-lg">
               <p className="text-yellow-300/80 text-xs uppercase tracking-wider">Game Code</p>
               <p className="text-4xl font-bold text-white tracking-[0.3em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
             </div>
           ) : (
-            <div className="w-48" /> /* Spacer to maintain layout */
+            <div className="hidden lg:block w-48" /> /* Spacer to maintain layout */
           )}
-          <h1 className="text-5xl font-bold text-white" style={{ fontFamily: 'Mountains of Christmas, cursive', textShadow: '3px 3px 6px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.2)' }}>🎄 Christmas Trivia 🎄</h1>
+          <h1 className="text-center text-4xl lg:text-5xl xl:text-6xl font-bold text-white festive-title">
+            🎄 Christmas Trivia 🎄
+          </h1>
           <div className="flex items-center gap-4">
             {(game.status === 'playing' || game.status === 'paused') && (
-              <button onClick={pauseGame} className="bg-gradient-to-br from-yellow-600 to-orange-600 text-white text-2xl font-bold py-3 px-6 rounded-xl border-2 border-yellow-400 shadow-lg hover:scale-105 transition-transform">⏸️</button>
+              <button
+                onClick={pauseGame}
+                className="btn-festive bg-gradient-to-br from-yellow-600 to-orange-600 text-white text-2xl font-bold py-3 px-6 rounded-xl border-2 border-yellow-400 shadow-lg hover:scale-105 transition-transform"
+              >
+                ⏸️
+              </button>
             )}
             <div className="candy-cane-border shadow-lg">
               <div className="bg-gray-900 px-8 py-4 rounded-xl min-w-[140px] text-center">
@@ -297,11 +314,13 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 flex gap-6 min-h-0">
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-[320px,1fr,320px] xl:grid-cols-[360px,1fr,360px] gap-4 lg:gap-6 min-h-0">
           {/* Leaderboard */}
-          <aside className="w-64 flex flex-col">
-            <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🏆 Leaderboard</h2>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          <aside className="hidden lg:flex flex-col min-h-0">
+            <div className="festive-surface rounded-2xl p-4">
+              <h2 className="text-3xl text-yellow-300 text-center font-bold festive-title">🏆 Leaderboard</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-3">
               {sortedTeams.map((team, index) => {
                 const color = getTeamColorByName(team.color)
                 const medal = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : null
@@ -325,8 +344,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
           <section className="flex-1 flex flex-col min-h-0">
             {game.status === 'waiting' ? (
               <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="question-banner p-10 rounded-3xl text-center shadow-2xl mb-8">
-                  <h2 className="text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>📱 Scan to Join!</h2>
+                <div className="question-banner p-8 lg:p-10 rounded-3xl text-center shadow-2xl mb-8 w-full max-w-3xl">
+                  <h2 className="text-5xl lg:text-6xl font-bold text-white mb-6 festive-title">📱 Scan to Join!</h2>
                   <div className="bg-white p-5 rounded-2xl inline-block mb-6 shadow-inner">
                     {hostUrl && <QRCodeSVG value={joinUrl} size={200} level="M" />}
                   </div>
@@ -334,9 +353,19 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   <p className="text-white/90 text-lg break-all font-mono bg-black/30 px-4 py-2 rounded-lg">{joinUrl}</p>
                 </div>
                 <div className="flex gap-6">
-                  <button onClick={() => setShowSettings(true)} className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-2xl font-bold py-5 px-10 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>⚙️ Settings</button>
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="btn-festive bg-gradient-to-br from-blue-600 to-blue-700 text-white text-2xl font-bold py-5 px-10 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform festive-title"
+                  >
+                    ⚙️ Settings
+                  </button>
                   {teams.length > 0 && (
-                    <button onClick={startGame} className="bg-gradient-to-br from-green-600 to-green-700 text-white text-2xl font-bold py-5 px-10 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform animate-pulse" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🎮 Start! ({teams.length} teams)</button>
+                    <button
+                      onClick={startGame}
+                      className="btn-festive bg-gradient-to-br from-green-600 to-green-700 text-white text-2xl font-bold py-5 px-10 rounded-xl border-4 border-yellow-400 shadow-lg hover:scale-105 transition-transform animate-pulse festive-title"
+                    >
+                      🎮 Start! ({teams.length} teams)
+                    </button>
                   )}
                 </div>
                 {teams.length === 0 && <p className="text-yellow-300 text-xl animate-pulse mt-6">Waiting for players...</p>}
@@ -344,11 +373,11 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
             ) : game.status === 'finished' ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="question-banner p-14 rounded-3xl text-center shadow-2xl">
-                  <h2 className="text-7xl font-bold text-yellow-300 mb-10" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🎉 Game Over! 🎉</h2>
+                  <h2 className="text-6xl lg:text-7xl font-bold text-yellow-300 mb-10 festive-title">🎉 Game Over! 🎉</h2>
                   {sortedTeams.length > 0 && (
                     <>
                       <p className="text-3xl text-white/80 mb-3">Winner</p>
-                      <p className="text-6xl font-bold text-white mb-4" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>👑 {sortedTeams[0].name}</p>
+                      <p className="text-5xl lg:text-6xl font-bold text-white mb-4 festive-title">👑 {sortedTeams[0].name}</p>
                       <p className="text-5xl text-yellow-300 font-bold mb-8">{sortedTeams[0].score} points</p>
                     </>
                   )}
@@ -400,11 +429,13 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   </span>
                 </div>
 
-                <div className="question-banner p-8 rounded-2xl mb-5 shadow-xl">
-                  <p className="text-5xl text-white text-center font-bold leading-tight" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>{currentQ.question}</p>
+                <div className="question-banner p-6 lg:p-8 rounded-2xl mb-5 shadow-xl">
+                  <p className="text-4xl lg:text-5xl xl:text-6xl text-white text-center font-bold leading-tight festive-title">
+                    {currentQ.question}
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5 flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5 flex-1 min-h-0">
                   {currentQ.answers.map((answer, index) => {
                     const colors = [
                       { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
@@ -415,9 +446,12 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                     const isCorrect = index === currentQ.correct
                     const showCorrect = revealPhase === 'answer'
                     return (
-                      <div key={index} className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-6 flex items-center justify-center shadow-lg transition-all duration-700 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-95' : ''}`}>
-                        <span className="text-3xl font-bold text-white text-center leading-snug" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-                          <span className="text-yellow-200 mr-3 text-4xl">{String.fromCharCode(65 + index)}</span>
+                      <div
+                        key={index}
+                        className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-5 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 min-h-[120px] lg:min-h-[160px] ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-[1.02] lg:scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-[0.99] lg:scale-95' : ''}`}
+                      >
+                        <span className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white text-center leading-snug festive-title">
+                          <span className="text-yellow-200 mr-3 text-3xl lg:text-4xl xl:text-5xl">{String.fromCharCode(65 + index)}</span>
                           {answer}
                           {showCorrect && isCorrect && <span className="ml-4 text-4xl">✓</span>}
                         </span>
@@ -431,11 +465,13 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
 
           {/* Answer Panel - Only show during playing, not during reveal */}
           {game.status === 'playing' && revealPhase === 'none' && (
-            <aside className="w-64 flex flex-col">
-              <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>
-                🔒 Locked In <span className="text-white/60 text-lg">({currentAnswers.length}/{teams.length})</span>
-              </h2>
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            <aside className="hidden lg:flex flex-col min-h-0">
+              <div className="festive-surface rounded-2xl p-4">
+                <h2 className="text-3xl text-yellow-300 text-center font-bold festive-title">
+                  🔒 Locked In <span className="text-white/60 text-xl">({currentAnswers.length}/{teams.length})</span>
+                </h2>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-3">
                 {sortedCurrentAnswers.map((ans, idx) => {
                   const team = teams.find(t => t.id === ans.team_id)
                   if (!team) return null
@@ -469,9 +505,10 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
           
           {/* Placeholder for reveal phases to maintain layout */}
           {(game.status === 'revealing' || revealPhase !== 'none') && game.status !== 'waiting' && game.status !== 'finished' && (
-            <aside className="w-64" />
+            <aside className="hidden lg:block" />
           )}
         </main>
+        </div>
       </div>
     </div>
   )

@@ -24,6 +24,17 @@ body {
   overflow-x: hidden;
   overscroll-behavior: none;
   font-family: system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ==================== SAFE AREAS ==================== */
@@ -54,6 +65,31 @@ body {
     );
   background-attachment: fixed;
   min-height: 100vh;
+}
+
+/* ==================== FESTIVE UI PRIMITIVES ==================== */
+.festive-surface {
+  background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55));
+  border: 1px solid rgba(255, 215, 0, 0.18);
+  box-shadow:
+    0 18px 60px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px);
+}
+
+.festive-title {
+  font-family: 'Mountains of Christmas', cursive;
+  text-shadow: 3px 3px 8px rgba(0,0,0,0.55), 0 0 40px rgba(255,215,0,0.18);
+}
+
+.festive-subtitle {
+  font-family: 'Cinzel Decorative', serif;
+  letter-spacing: 0.08em;
+}
+
+.btn-festive {
+  touch-action: manipulation;
+  user-select: none;
 }
 
 /* ==================== SNOWFLAKES ==================== */
@@ -104,6 +140,17 @@ body {
   z-index: 50;
 }
 
+.christmas-lights-soft {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 45px;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.95;
+}
+
 .light-wire-top,
 .light-wire {
   position: absolute;
@@ -146,6 +193,17 @@ body {
   height: 45px;
   pointer-events: none;
   z-index: 50;
+}
+
+.christmas-lights-soft-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45px;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.9;
 }
 
 .light-wire-bottom {
@@ -265,6 +323,12 @@ body {
 input:focus,
 button:focus {
   outline: none;
+}
+
+/* More visible focus for keyboard users */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(255, 215, 0, 0.8);
+  outline-offset: 3px;
 }
 
 /* Animations */
