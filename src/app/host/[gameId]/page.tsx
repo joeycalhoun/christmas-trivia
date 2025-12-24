@@ -45,14 +45,15 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const settingsRef = useRef(DEFAULT_SETTINGS)
   const pausedTimeRef = useRef<number | null>(null)
   const hasRevealedRef = useRef(false)
+  const nextQuestionRef = useRef<DynamicQuestion | null>(null)
+  const isFetchingNextRef = useRef(false)
 
   useEffect(() => { gameRef.current = game }, [game])
   useEffect(() => { settingsRef.current = settings }, [settings])
   useEffect(() => { setHostUrl(window.location.origin) }, [])
 
-  // Fetch a new question from the API
-  const fetchQuestion = async (questionNumber: number): Promise<DynamicQuestion | null> => {
-    setIsLoadingQuestion(true)
+  // Fetch a question from the API (doesn't set loading state for background fetches)
+  const fetchQuestionSilent = async (questionNumber: number): Promise<DynamicQuestion | null> => {
     try {
       const response = await fetch('/api/generate-question', {
         method: 'POST',
@@ -60,14 +61,30 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         body: JSON.stringify({ questionNumber }),
       })
       if (!response.ok) throw new Error('Failed to fetch question')
-      const question = await response.json()
-      return question
+      return await response.json()
     } catch (error) {
       console.error('Error fetching question:', error)
       return null
-    } finally {
-      setIsLoadingQuestion(false)
     }
+  }
+
+  // Fetch with loading state (for initial question)
+  const fetchQuestion = async (questionNumber: number): Promise<DynamicQuestion | null> => {
+    setIsLoadingQuestion(true)
+    const question = await fetchQuestionSilent(questionNumber)
+    setIsLoadingQuestion(false)
+    return question
+  }
+
+  // Pre-fetch the next question in the background
+  const prefetchNextQuestion = async (currentQuestionNumber: number) => {
+    const nextNum = currentQuestionNumber + 1
+    if (nextNum >= settingsRef.current.totalQuestions || isFetchingNextRef.current) return
+    
+    isFetchingNextRef.current = true
+    const question = await fetchQuestionSilent(nextNum)
+    nextQuestionRef.current = question
+    isFetchingNextRef.current = false
   }
 
   useEffect(() => {
@@ -86,6 +103,10 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       // Load current question if game is in progress
       if (gameData.current_question_data) {
         setCurrentQuestion(gameData.current_question_data as DynamicQuestion)
+        // Pre-fetch next question if game is already playing
+        if (gameData.status === 'playing') {
+          prefetchNextQuestion(gameData.current_question)
+        }
       }
       
       const { data: teamsData } = await supabase.from('teams').select().eq('game_id', gameId).order('created_at')
@@ -212,6 +233,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     hasRevealedRef.current = false
     setRevealPhase('none')
     setWinners([])
+    nextQuestionRef.current = null
     
     await supabase.from('games').update({ 
       status: 'playing', 
@@ -225,6 +247,9 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     await supabase.from('teams').update({ has_answered: false }).eq('game_id', gameId)
     setGame(prev => prev ? { ...prev, status: 'playing', current_question: 0, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions } : null)
     setTimeLeft(settings.questionTime)
+    
+    // Pre-fetch the next question in background
+    prefetchNextQuestion(0)
   }
 
   const pauseGame = async () => {
@@ -263,8 +288,14 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       return
     }
     
-    // Fetch the next question
-    const question = await fetchQuestion(nextQ)
+    // Use pre-fetched question if available, otherwise fetch now
+    let question = nextQuestionRef.current
+    if (!question) {
+      setIsLoadingQuestion(true)
+      question = await fetchQuestionSilent(nextQ)
+      setIsLoadingQuestion(false)
+    }
+    
     if (!question) {
       console.error('Failed to fetch next question')
       await supabase.from('games').update({ status: 'finished' }).eq('id', gameId)
@@ -272,6 +303,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       return
     }
     
+    // Clear the pre-fetched question
+    nextQuestionRef.current = null
     setCurrentQuestion(question)
     
     await supabase.from('teams').update({ has_answered: false }).eq('game_id', gameId)
@@ -285,6 +318,9 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     }).eq('id', gameId)
     setGame(prev => prev ? { ...prev, status: 'playing', current_question: nextQ, question_time_seconds: currentSettings.questionTime } : null)
     setTimeLeft(currentSettings.questionTime)
+    
+    // Pre-fetch the next question in background
+    prefetchNextQuestion(nextQ)
   }
 
   const currentAnswers = answers.filter(a => a.question_index === game?.current_question)
@@ -543,29 +579,32 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 grid-rows-4 sm:grid-rows-2 gap-4 lg:gap-5 flex-1 min-h-0 overflow-hidden">
-                  {currentQuestion.answers.map((answer, index) => {
-                    const colors = [
-                      { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
-                      { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400' },
-                      { bg: 'from-red-600 to-red-700', border: 'border-red-400' },
-                      { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400' },
-                    ]
-                    const isCorrect = index === currentQuestion.correct
-                    const showCorrect = revealPhase === 'answer'
-                    return (
-                      <div
-                        key={index}
-                        className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-4 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 min-h-0 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-[1.02] lg:scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-[0.99] lg:scale-95' : ''}`}
-                      >
-                        <span className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white text-center leading-snug festive-title">
-                          <span className="text-yellow-200 mr-3 text-3xl lg:text-4xl xl:text-5xl">{String.fromCharCode(65 + index)}</span>
-                          {answer}
-                          {showCorrect && isCorrect && <span className="ml-4 text-4xl">✓</span>}
-                        </span>
-                      </div>
-                    )
-                  })}
+                {/* Answer grid with padding to allow for scale effect */}
+                <div className="flex-1 min-h-0 p-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 grid-rows-4 sm:grid-rows-2 gap-4 lg:gap-5 h-full">
+                    {currentQuestion.answers.map((answer, index) => {
+                      const colors = [
+                        { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
+                        { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400' },
+                        { bg: 'from-red-600 to-red-700', border: 'border-red-400' },
+                        { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400' },
+                      ]
+                      const isCorrect = index === currentQuestion.correct
+                      const showCorrect = revealPhase === 'answer'
+                      return (
+                        <div
+                          key={index}
+                          className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-4 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-105 shadow-2xl shadow-green-500/50 z-10' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-95' : ''}`}
+                        >
+                          <span className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white text-center leading-snug festive-title">
+                            <span className="text-yellow-200 mr-3 text-3xl lg:text-4xl xl:text-5xl">{String.fromCharCode(65 + index)}</span>
+                            {answer}
+                            {showCorrect && isCorrect && <span className="ml-4 text-4xl">✓</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             ) : null}
