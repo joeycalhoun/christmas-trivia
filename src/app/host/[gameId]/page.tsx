@@ -517,20 +517,20 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
               </button>
             )}
             <div className="candy-cane-border shadow-lg">
-              <div className="bg-gray-900 px-8 py-4 rounded-xl min-w-[140px] text-center">
+              <div className="bg-gray-900 px-8 py-4 rounded-xl min-w-[140px] h-[88px] flex items-center justify-center">
                 {game.status === 'playing' && isGracePeriod && graceTimeLeft !== null ? (
                   <div className="flex flex-col items-center">
-                    <span className="text-lg text-yellow-300 font-bold">📖 READ</span>
-                    <span className="text-5xl font-bold text-yellow-400" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{graceTimeLeft}</span>
+                    <span className="text-sm text-yellow-300 font-bold leading-tight">📖 READ</span>
+                    <span className="text-5xl font-bold text-yellow-400 leading-none" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{graceTimeLeft}</span>
                   </div>
                 ) : game.status === 'playing' ? (
-                  <span className={`text-6xl font-bold ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`} style={{ fontFamily: 'Cinzel Decorative, serif' }}>{timeLeft}</span>
+                  <span className={`text-6xl font-bold leading-none ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`} style={{ fontFamily: 'Cinzel Decorative, serif' }}>{timeLeft}</span>
                 ) : game.status === 'paused' ? (
                   <span className="text-2xl text-yellow-400 font-bold">PAUSED</span>
                 ) : game.status === 'revealing' ? (
-                  <span className="text-2xl text-yellow-400">✨</span>
+                  <span className="text-4xl text-yellow-400">✨</span>
                 ) : game.status === 'finished' ? (
-                  <span className="text-2xl text-green-400">🏆</span>
+                  <span className="text-4xl text-green-400">🏆</span>
                 ) : (
                   <span className="text-2xl text-yellow-400">Ready</span>
                 )}
@@ -705,50 +705,56 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
             ) : null}
           </section>
 
-          {/* Answer Panel - Only show during playing, not during reveal */}
-          {game.status === 'playing' && revealPhase === 'none' && (
-            <aside className="hidden lg:flex flex-col min-h-0">
-              <div className="festive-surface rounded-2xl p-4">
-                <h2 className="text-3xl text-yellow-300 text-center font-bold festive-title">
-                  🔒 Locked In <span className="text-white/60 text-xl">({currentAnswers.length}/{teams.length})</span>
-                </h2>
-              </div>
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-3">
-                {sortedCurrentAnswers.map((ans, idx) => {
-                  const team = teams.find(t => t.id === ans.team_id)
-                  if (!team) return null
-                  const color = getTeamColorByName(team.color)
-                  return (
-                    <div key={ans.id} className={`bg-gradient-to-br ${color.bg} border-2 ${color.border} rounded-xl p-3 shadow-md`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="bg-black/30 text-yellow-300 font-bold px-2 py-0.5 rounded text-sm">#{idx + 1}</span>
-                          <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
+          {/* Right Panel - Always present for layout stability */}
+          <aside className="hidden lg:flex flex-col min-h-0">
+            {game.status === 'playing' && revealPhase === 'none' ? (
+              <>
+                <div className="festive-surface rounded-2xl p-4">
+                  <h2 className="text-3xl text-yellow-300 text-center font-bold festive-title">
+                    🔒 Locked In <span className="text-white/60 text-xl">({currentAnswers.length}/{teams.length})</span>
+                  </h2>
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-3">
+                  {sortedCurrentAnswers.map((ans, idx) => {
+                    const team = teams.find(t => t.id === ans.team_id)
+                    if (!team) return null
+                    const color = getTeamColorByName(team.color)
+                    return (
+                      <div key={ans.id} className={`bg-gradient-to-br ${color.bg} border-2 ${color.border} rounded-xl p-3 shadow-md`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-black/30 text-yellow-300 font-bold px-2 py-0.5 rounded text-sm">#{idx + 1}</span>
+                            <span className="text-white font-bold truncate max-w-[100px]">{team.name}</span>
+                          </div>
+                          <span className="text-white/50">🔒</span>
                         </div>
-                        <span className="text-white/50">🔒</span>
                       </div>
+                    )
+                  })}
+                  {currentAnswers.length === 0 && (
+                    <div className="text-center text-gray-400 py-8">
+                      <p className="text-4xl mb-2">🤔</p>
+                      <p>Waiting...</p>
                     </div>
-                  )
-                })}
-                {currentAnswers.length === 0 && (
-                  <div className="text-center text-gray-400 py-8">
-                    <p className="text-4xl mb-2">🤔</p>
-                    <p>Waiting...</p>
-                  </div>
-                )}
-                {currentAnswers.length > 0 && currentAnswers.length < teams.length && (
-                  <div className="text-center text-gray-400 py-3 text-sm border-t border-white/10 mt-2">
-                    ⏳ {teams.length - currentAnswers.length} thinking...
-                  </div>
-                )}
+                  )}
+                  {currentAnswers.length > 0 && currentAnswers.length < teams.length && (
+                    <div className="text-center text-gray-400 py-3 text-sm border-t border-white/10 mt-2">
+                      ⏳ {teams.length - currentAnswers.length} thinking...
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : game.status !== 'waiting' && game.status !== 'finished' ? (
+              /* Empty placeholder during reveal/other states */
+              <div className="opacity-0 pointer-events-none">
+                <div className="festive-surface rounded-2xl p-4">
+                  <h2 className="text-3xl text-yellow-300 text-center font-bold festive-title">
+                    🔒 Locked In
+                  </h2>
+                </div>
               </div>
-            </aside>
-          )}
-          
-          {/* Placeholder for reveal phases to maintain layout */}
-          {(game.status === 'revealing' || revealPhase !== 'none') && game.status !== 'waiting' && game.status !== 'finished' && (
-            <aside className="hidden lg:block" />
-          )}
+            ) : null}
+          </aside>
         </main>
         </div>
       </div>
