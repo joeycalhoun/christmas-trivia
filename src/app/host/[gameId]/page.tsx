@@ -216,13 +216,6 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     return () => clearInterval(timer)
   }, [game?.status, gameId, isGracePeriod])
 
-  // When grace period ends, start the main timer
-  useEffect(() => {
-    if (!isGracePeriod && graceTimeLeft === null && game?.status === 'playing') {
-      setTimeLeft(settingsRef.current.questionTime)
-    }
-  }, [isGracePeriod, graceTimeLeft, game?.status])
-
   const saveSettings = async () => {
     await supabase.from('games').update({ 
       question_time_seconds: settings.questionTime, 
@@ -242,26 +235,38 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     if (game?.status === 'paused') setShowMenu(true)
   }
 
-  // Grace period timer effect
+  // Grace period timer - just counts down
   useEffect(() => {
     if (!isGracePeriod || graceTimeLeft === null || graceTimeLeft <= 0) return
     
     const timer = setInterval(() => {
       setGraceTimeLeft(prev => {
-        if (prev === null || prev <= 1) {
-          // Grace period ended - enable answering
-          setIsGracePeriod(false)
-          supabase.from('games').update({ 
-            answering_enabled: true,
-            question_start_time: new Date().toISOString() 
-          }).eq('id', gameId)
-          return null
-        }
+        if (prev === null || prev <= 1) return 0
         return prev - 1
       })
     }, 1000)
     
     return () => clearInterval(timer)
+  }, [isGracePeriod, graceTimeLeft])
+
+  // When grace period countdown hits 0, enable answering
+  useEffect(() => {
+    if (isGracePeriod && graceTimeLeft === 0) {
+      const enableAnswering = async () => {
+        setIsGracePeriod(false)
+        setGraceTimeLeft(null)
+        setTimeLeft(settingsRef.current.questionTime)
+        
+        await supabase.from('games').update({ 
+          answering_enabled: true,
+          question_start_time: new Date().toISOString() 
+        }).eq('id', gameId)
+        
+        // Update local state
+        setGame(prev => prev ? { ...prev, answering_enabled: true } : null)
+      }
+      enableAnswering()
+    }
   }, [isGracePeriod, graceTimeLeft, gameId])
 
   const startGame = async () => {
