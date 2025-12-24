@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, generateGameCode } from '@/lib/supabase'
 
@@ -9,10 +9,39 @@ export default function Home() {
   const [joinCode, setJoinCode] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState('')
+  const [snowflakes, setSnowflakes] = useState<Array<{id: number, left: number, delay: number, duration: number}>>([])
+
+  // Generate snowflakes on mount (client-side only)
+  useEffect(() => {
+    const flakes = Array.from({ length: 40 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 10,
+      duration: 8 + Math.random() * 6,
+    }))
+    setSnowflakes(flakes)
+  }, [])
+
+  const cleanupOldGames = async () => {
+    // Delete games older than 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    
+    try {
+      await supabase
+        .from('games')
+        .delete()
+        .lt('created_at', twentyFourHoursAgo)
+    } catch (err) {
+      console.log('Cleanup error (non-critical):', err)
+    }
+  }
 
   const createGame = async () => {
     setIsCreating(true)
     setError('')
+    
+    // Clean up old games first
+    await cleanupOldGames()
     
     try {
       const code = generateGameCode()
@@ -67,10 +96,51 @@ export default function Home() {
   return (
     <div className="min-h-screen wood-background relative overflow-hidden flex items-center justify-center">
       {/* Snow Effect */}
-      <Snowflakes />
+      <div className="snowflake-container">
+        {snowflakes.map((flake) => (
+          <div
+            key={flake.id}
+            className="snowflake"
+            style={{
+              left: `${flake.left}%`,
+              animationDelay: `${flake.delay}s`,
+              animationDuration: `${flake.duration}s`,
+            }}
+          >
+            ❄
+          </div>
+        ))}
+      </div>
       
-      {/* Christmas Lights */}
-      <ChristmasLights />
+      {/* Christmas Lights - Top */}
+      <div className="christmas-lights-top">
+        <div className="light-wire-top" />
+        {Array.from({ length: 25 }).map((_, i) => (
+          <div
+            key={i}
+            className={`light-bulb-top ${['light-red', 'light-green', 'light-gold', 'light-blue', 'light-purple'][i % 5]}`}
+            style={{
+              left: `${2 + i * 4}%`,
+              animationDelay: `${i * 0.15}s`,
+            }}
+          />
+        ))}
+      </div>
+      
+      {/* Christmas Lights - Bottom */}
+      <div className="christmas-lights-bottom">
+        <div className="light-wire-bottom" />
+        {Array.from({ length: 25 }).map((_, i) => (
+          <div
+            key={i}
+            className={`light-bulb-bottom ${['light-purple', 'light-blue', 'light-gold', 'light-green', 'light-red'][i % 5]}`}
+            style={{
+              left: `${2 + i * 4}%`,
+              animationDelay: `${i * 0.15 + 0.5}s`,
+            }}
+          />
+        ))}
+      </div>
 
       <div className="relative z-10 text-center px-4">
         {/* Title */}
@@ -167,62 +237,5 @@ export default function Home() {
         </div>
       </div>
     </div>
-  )
-}
-
-// Snowflakes component
-function Snowflakes() {
-  return (
-    <>
-      {Array.from({ length: 30 }).map((_, i) => (
-        <div
-          key={i}
-          className="snowflake"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 10}s`,
-            animationDuration: `${8 + Math.random() * 6}s`,
-          }}
-        >
-          ❄
-        </div>
-      ))}
-    </>
-  )
-}
-
-// Christmas Lights component
-function ChristmasLights() {
-  return (
-    <>
-      <div className="christmas-lights">
-        <div className="light-wire" />
-        {Array.from({ length: 25 }).map((_, i) => (
-          <div
-            key={i}
-            className={`light-bulb ${['light-red', 'light-green', 'light-gold', 'light-blue', 'light-purple'][i % 5]}`}
-            style={{
-              left: `${2 + i * 4}%`,
-              animationDelay: `${i * 0.15}s`,
-            }}
-          />
-        ))}
-      </div>
-      <div className="christmas-lights" style={{ top: 'auto', bottom: 0 }}>
-        <div className="light-wire" style={{ top: 'auto', bottom: 20 }} />
-        {Array.from({ length: 25 }).map((_, i) => (
-          <div
-            key={i}
-            className={`light-bulb ${['light-purple', 'light-blue', 'light-gold', 'light-green', 'light-red'][i % 5]}`}
-            style={{
-              left: `${2 + i * 4}%`,
-              top: 'auto',
-              bottom: 25,
-              animationDelay: `${i * 0.15 + 0.5}s`,
-            }}
-          />
-        ))}
-      </div>
-    </>
   )
 }

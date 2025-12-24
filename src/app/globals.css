@@ -18,14 +18,12 @@
 }
 
 html {
-  /* Enable smooth scrolling */
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   overflow: hidden;
-  /* Prevent pull-to-refresh on mobile */
   overscroll-behavior: none;
 }
 
@@ -35,17 +33,6 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-}
-
-/* Touch manipulation for better mobile interaction */
-.touch-manipulation {
-  touch-action: manipulation;
-}
-
-/* Prevent text selection on game elements */
-.no-select {
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 /* Wooden Background */
@@ -68,46 +55,54 @@ body {
     );
 }
 
-/* Christmas Lights */
-.christmas-lights {
+/* ==================== SNOWFLAKES ==================== */
+.snowflake-container {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 60px;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.snowflake {
+  position: absolute;
+  top: -20px;
+  color: white;
+  font-size: 1.2rem;
+  opacity: 0.8;
+  text-shadow: 0 0 5px white;
+  animation: snowfall linear infinite;
   pointer-events: none;
 }
 
-.light-bulb {
-  width: 14px;
-  height: 20px;
-  border-radius: 50% 50% 50% 50%;
-  position: absolute;
-  top: 25px;
-  animation: twinkle 1.5s ease-in-out infinite;
+@keyframes snowfall {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0.3;
+  }
 }
 
-.light-bulb::before {
-  content: '';
+/* ==================== CHRISTMAS LIGHTS - TOP ==================== */
+.christmas-lights-top {
   position: absolute;
-  width: 6px;
-  height: 6px;
-  background: #333;
-  border-radius: 2px;
-  top: -4px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  pointer-events: none;
+  z-index: 20;
 }
 
-.light-red { background: radial-gradient(circle at 30% 30%, #ff6b6b, #c41e3a); box-shadow: 0 0 15px #ff0000, 0 0 30px #ff000080; }
-.light-green { background: radial-gradient(circle at 30% 30%, #90ee90, #228b22); box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff0080; }
-.light-gold { background: radial-gradient(circle at 30% 30%, #ffec8b, #ffd700); box-shadow: 0 0 15px #ffd700, 0 0 30px #ffd70080; }
-.light-blue { background: radial-gradient(circle at 30% 30%, #87ceeb, #4169e1); box-shadow: 0 0 15px #0066ff, 0 0 30px #0066ff80; }
-.light-purple { background: radial-gradient(circle at 30% 30%, #dda0dd, #9932cc); box-shadow: 0 0 15px #9932cc, 0 0 30px #9932cc80; }
-
-.light-wire {
+.light-wire-top {
   position: absolute;
-  top: 20px;
+  top: 18px;
   left: 0;
   right: 0;
   height: 3px;
@@ -115,123 +110,137 @@ body {
   border-radius: 2px;
 }
 
-/* Answer Buttons */
-.answer-btn {
-  position: relative;
-  transition: all 0.3s ease;
-  transform-style: preserve-3d;
-}
-
-.answer-btn:hover {
-  transform: scale(1.05) translateY(-5px);
-  filter: brightness(1.1);
-}
-
-.answer-btn:active {
-  transform: scale(0.98);
-}
-
-/* Gift Bow */
-.bow {
+.light-bulb-top {
+  width: 12px;
+  height: 18px;
+  border-radius: 50%;
   position: absolute;
-  top: -15px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40px;
-  height: 40px;
+  top: 22px;
+  animation: twinkle 1.5s ease-in-out infinite;
 }
 
-.bow::before,
-.bow::after {
+.light-bulb-top::before {
   content: '';
   position: absolute;
-  width: 20px;
-  height: 15px;
-  border-radius: 50% 50% 50% 50%;
-  top: 5px;
-}
-
-.bow::before {
-  left: 0;
-  transform: rotate(-30deg);
-}
-
-.bow::after {
-  right: 0;
-  transform: rotate(30deg);
-}
-
-.bow-center {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  top: 50%;
+  width: 6px;
+  height: 5px;
+  background: #333;
+  border-radius: 2px 2px 0 0;
+  top: -4px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
 }
 
-/* Snow effect */
-.snowflake {
+/* ==================== CHRISTMAS LIGHTS - BOTTOM ==================== */
+.christmas-lights-bottom {
   position: absolute;
-  color: white;
-  font-size: 1.5rem;
-  animation: snow 10s linear infinite;
-  opacity: 0.8;
-  text-shadow: 0 0 5px white;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.light-wire-bottom {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+}
+
+.light-bulb-bottom {
+  width: 12px;
+  height: 18px;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 8px;
+  animation: twinkle 1.5s ease-in-out infinite;
+}
+
+.light-bulb-bottom::before {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 5px;
+  background: #333;
+  border-radius: 0 0 2px 2px;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ==================== LIGHT COLORS ==================== */
+.light-red { background: radial-gradient(circle at 30% 30%, #ff6b6b, #c41e3a); box-shadow: 0 0 12px #ff0000, 0 0 25px #ff000080; }
+.light-green { background: radial-gradient(circle at 30% 30%, #90ee90, #228b22); box-shadow: 0 0 12px #00ff00, 0 0 25px #00ff0080; }
+.light-gold { background: radial-gradient(circle at 30% 30%, #ffec8b, #ffd700); box-shadow: 0 0 12px #ffd700, 0 0 25px #ffd70080; }
+.light-blue { background: radial-gradient(circle at 30% 30%, #87ceeb, #4169e1); box-shadow: 0 0 12px #0066ff, 0 0 25px #0066ff80; }
+.light-purple { background: radial-gradient(circle at 30% 30%, #dda0dd, #9932cc); box-shadow: 0 0 12px #9932cc, 0 0 25px #9932cc80; }
+
+/* Host page lights (simpler, just top) */
+.christmas-lights {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.light-wire {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+}
+
+.light-bulb {
+  width: 12px;
+  height: 18px;
+  border-radius: 50%;
+  position: absolute;
+  top: 22px;
+  animation: twinkle 1.5s ease-in-out infinite;
+}
+
+.light-bulb::before {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 5px;
+  background: #333;
+  border-radius: 2px 2px 0 0;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 @keyframes twinkle {
   0%, 100% { opacity: 1; filter: brightness(1.2); }
-  50% { opacity: 0.4; filter: brightness(0.8); }
+  50% { opacity: 0.5; filter: brightness(0.9); }
 }
 
-@keyframes snow {
-  0% {
-    transform: translateY(-10vh) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(110vh) rotate(360deg);
-    opacity: 0.3;
-  }
-}
-
-/* Team score cards */
-.team-card {
-  background: linear-gradient(145deg, #8b0000, #cc0000);
-  border: 4px solid #ffd700;
-  box-shadow: 
-    0 4px 15px rgba(0,0,0,0.5),
-    inset 0 2px 10px rgba(255,255,255,0.2);
-}
-
-.team-card-green {
-  background: linear-gradient(145deg, #006400, #228b22);
-}
-
-.team-card-blue {
-  background: linear-gradient(145deg, #00008b, #4169e1);
-}
-
-.team-card-gold {
-  background: linear-gradient(145deg, #b8860b, #daa520);
-}
-
-/* Candy cane timer */
+/* ==================== CANDY CANE TIMER ==================== */
 .candy-cane-border {
   background: repeating-linear-gradient(
     45deg,
     #ff0000,
-    #ff0000 10px,
-    #ffffff 10px,
-    #ffffff 20px
+    #ff0000 8px,
+    #ffffff 8px,
+    #ffffff 16px
   );
-  padding: 8px;
-  border-radius: 20px;
+  padding: 6px;
+  border-radius: 16px;
 }
 
-/* Question banner */
+/* ==================== QUESTION BANNER ==================== */
 .question-banner {
   background: linear-gradient(180deg, #8b0000 0%, #cc0000 50%, #8b0000 100%);
   border: 4px solid #ffd700;
@@ -240,40 +249,20 @@ body {
     inset 0 2px 10px rgba(255,255,255,0.2);
 }
 
-/* Star decoration */
-.star {
-  color: #ffd700;
-  text-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
-  animation: twinkle 2s ease-in-out infinite;
+/* ==================== TEAM CARDS ==================== */
+.team-card {
+  background: linear-gradient(145deg, #8b0000, #cc0000);
+  border: 4px solid #ffd700;
+  box-shadow: 
+    0 4px 15px rgba(0,0,0,0.5),
+    inset 0 2px 10px rgba(255,255,255,0.2);
 }
 
-/* Ribbon effect for header */
-.ribbon {
-  position: relative;
-}
+.team-card-green { background: linear-gradient(145deg, #006400, #228b22); }
+.team-card-blue { background: linear-gradient(145deg, #00008b, #4169e1); }
+.team-card-gold { background: linear-gradient(145deg, #b8860b, #daa520); }
 
-.ribbon::before,
-.ribbon::after {
-  content: '';
-  position: absolute;
-  bottom: -15px;
-  width: 30px;
-  height: 30px;
-  background: #8b0000;
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
-}
-
-.ribbon::before {
-  left: -15px;
-  transform: rotate(-45deg);
-}
-
-.ribbon::after {
-  right: -15px;
-  transform: rotate(45deg) scaleX(-1);
-}
-
-/* Pulse gold animation */
+/* ==================== ANIMATIONS ==================== */
 .animate-pulse-gold {
   animation: pulseGold 2s ease-in-out infinite;
 }
@@ -281,4 +270,11 @@ body {
 @keyframes pulseGold {
   0%, 100% { box-shadow: 0 0 5px #ffd700, 0 0 10px #ffd700; }
   50% { box-shadow: 0 0 20px #ffd700, 0 0 30px #ffd700; }
+}
+
+/* Star decoration */
+.star {
+  color: #ffd700;
+  text-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+  animation: twinkle 2s ease-in-out infinite;
 }
