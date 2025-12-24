@@ -121,7 +121,7 @@ export default async function TestHostStatePage({ params }: { params: Promise<{ 
             </div>
           </header>
 
-          <main className="flex-1 grid grid-cols-1 lg:grid-cols-[320px,1fr,320px] xl:grid-cols-[360px,1fr,360px] gap-4 lg:gap-6 min-h-0 overflow-hidden">
+          <main className="flex-1 grid grid-cols-1 lg:grid-cols-[320px,1fr,320px] xl:grid-cols-[360px,1fr,360px] gap-4 lg:gap-6 min-h-0 overflow-visible">
             {/* Leaderboard */}
             <aside className="hidden lg:flex flex-col min-h-0">
               <div className="festive-surface rounded-2xl p-4">
@@ -147,7 +147,7 @@ export default async function TestHostStatePage({ params }: { params: Promise<{ 
             </aside>
 
             {/* Center */}
-            <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <section className="flex-1 flex flex-col min-h-0">
               {state === 'waiting' ? (
                 <div className="flex-1 flex flex-col items-center justify-center">
                   <div className="question-banner p-8 lg:p-10 rounded-3xl text-center shadow-2xl mb-8 w-full max-w-3xl">
