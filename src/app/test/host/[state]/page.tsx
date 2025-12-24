@@ -229,31 +229,34 @@ export default async function TestHostStatePage({ params }: { params: Promise<{ 
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 grid-rows-4 sm:grid-rows-2 gap-4 lg:gap-5 flex-1 min-h-0 overflow-hidden">
-                    {currentQ.answers.map((answer, index) => {
-                      const colors = [
-                        { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
-                        { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400' },
-                        { bg: 'from-red-600 to-red-700', border: 'border-red-400' },
-                        { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400' },
-                      ]
-                      const isCorrect = index === currentQ.correct
-                      const showCorrect = revealPhase === 'answer'
-                      return (
-                        <div
-                          key={index}
-                          className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-4 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 min-h-0 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-[1.02] lg:scale-105 shadow-2xl shadow-green-500/50' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-[0.99] lg:scale-95' : ''}`}
-                        >
-                          <span className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white text-center leading-snug festive-title">
-                            <span className="text-yellow-200 mr-3 text-3xl lg:text-4xl xl:text-5xl">
-                              {String.fromCharCode(65 + index)}
+                  {/* Answer grid with padding to allow for scale effect */}
+                  <div className="flex-1 min-h-0 p-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 grid-rows-4 sm:grid-rows-2 gap-4 lg:gap-5 h-full">
+                      {currentQ.answers.map((answer, index) => {
+                        const colors = [
+                          { bg: 'from-green-600 to-green-700', border: 'border-green-400' },
+                          { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400' },
+                          { bg: 'from-red-600 to-red-700', border: 'border-red-400' },
+                          { bg: 'from-yellow-500 to-orange-500', border: 'border-yellow-400' },
+                        ]
+                        const isCorrect = index === currentQ.correct
+                        const showCorrect = revealPhase === 'answer'
+                        return (
+                          <div
+                            key={index}
+                            className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border} border-4 rounded-2xl p-4 lg:p-6 flex items-center justify-center shadow-lg transition-all duration-700 ${showCorrect && isCorrect ? 'ring-8 ring-green-400 scale-105 shadow-2xl shadow-green-500/50 z-10' : ''} ${showCorrect && !isCorrect ? 'opacity-30 scale-95' : ''}`}
+                          >
+                            <span className="text-2xl lg:text-3xl xl:text-4xl font-bold text-white text-center leading-snug festive-title">
+                              <span className="text-yellow-200 mr-3 text-3xl lg:text-4xl xl:text-5xl">
+                                {String.fromCharCode(65 + index)}
+                              </span>
+                              {answer}
+                              {showCorrect && isCorrect && <span className="ml-4 text-4xl">✓</span>}
                             </span>
-                            {answer}
-                            {showCorrect && isCorrect && <span className="ml-4 text-4xl">✓</span>}
-                          </span>
-                        </div>
-                      )
-                    })}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
