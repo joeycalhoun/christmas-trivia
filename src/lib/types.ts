@@ -36,6 +36,13 @@ export interface GameSettings {
   totalQuestions: number
 }
 
+export interface DynamicQuestion {
+  question: string
+  answers: string[]
+  correct: number
+  difficulty: 'easy' | 'medium' | 'hard' | 'very_hard'
+}
+
 export const DEFAULT_SETTINGS: GameSettings = {
   questionTime: 20,
   totalQuestions: 10,

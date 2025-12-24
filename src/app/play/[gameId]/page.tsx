@@ -3,13 +3,17 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { triviaQuestions } from '@/lib/questions'
-import { Game, Team, Answer, getTeamColor, TEAM_COLORS } from '@/lib/types'
+import { Game, Team, Answer, DynamicQuestion, getTeamColor, TEAM_COLORS } from '@/lib/types'
+
+// Extended game type to include the question data
+interface GameWithQuestion extends Game {
+  current_question_data?: DynamicQuestion | null
+}
 
 export default function PlayPage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = use(params)
   const router = useRouter()
-  const [game, setGame] = useState<Game | null>(null)
+  const [game, setGame] = useState<GameWithQuestion | null>(null)
   const [team, setTeam] = useState<Team | null>(null)
   const [teamName, setTeamName] = useState('')
   const [selectedColor, setSelectedColor] = useState(0)
@@ -23,7 +27,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     const loadGame = async () => {
       const { data } = await supabase.from('games').select().eq('id', gameId).single()
       if (!data) { router.push('/'); return }
-      setGame(data)
+      setGame(data as GameWithQuestion)
       setTimeLeft(data.question_time_seconds || 20)
       
       const savedTeamId = localStorage.getItem(`team-${gameId}`)
@@ -39,7 +43,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     const channel = supabase.channel(`player-${gameId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
         (payload) => {
-          const newGame = payload.new as Game
+          const newGame = payload.new as GameWithQuestion
           setGame(newGame)
           if (newGame.status === 'playing') {
             // New question started
@@ -80,10 +84,10 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   }
 
   const submitAnswer = async (answerIndex: number) => {
-    if (hasAnswered || !team || !game || game.status !== 'playing') return
+    if (hasAnswered || !team || !game || game.status !== 'playing' || !game.current_question_data) return
     setHasAnswered(true)
     
-    const currentQ = triviaQuestions[game.current_question]
+    const currentQ = game.current_question_data
     const isCorrect = answerIndex === currentQ.correct
     const questionStartTime = game.question_start_time ? new Date(game.question_start_time).getTime() : Date.now() - ((game.question_time_seconds || 20) - timeLeft) * 1000
     
@@ -105,7 +109,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   if (!game) return <LoadingScreen />
   if (!team) return <JoinScreen game={game} teamName={teamName} setTeamName={setTeamName} selectedColor={selectedColor} setSelectedColor={setSelectedColor} isJoining={isJoining} error={error} joinGame={joinGame} />
 
-  const currentQ = triviaQuestions[game.current_question ?? 0]
+  const currentQ = game.current_question_data
   const teamColor = getTeamColor(TEAM_COLORS.findIndex(c => c.name === team.color) || 0)
   const totalQuestions = game.total_questions || 10
 
@@ -216,16 +220,36 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
                 {wasCorrect && pointsEarned > 0 && (
                   <p className="text-3xl text-green-300 font-bold animate-pulse">+{pointsEarned} points!</p>
                 )}
-                <p className="text-white/60 text-lg mt-4">The answer was: <span className="text-green-400 font-bold">{currentQ.answers[currentQ.correct]}</span></p>
+                {currentQ && (
+                  <p className="text-white/60 text-lg mt-4">The answer was: <span className="text-green-400 font-bold">{currentQ.answers[currentQ.correct]}</span></p>
+                )}
               </>
             ) : (
               <>
                 <div className="text-8xl mb-6">⏰</div>
                 <p className="text-4xl font-bold text-yellow-400 mb-4" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>Time&apos;s Up!</p>
-                <p className="text-white text-xl">Answer: <span className="text-green-400 font-bold">{currentQ.answers[currentQ.correct]}</span></p>
+                {currentQ && (
+                  <p className="text-white text-xl">Answer: <span className="text-green-400 font-bold">{currentQ.answers[currentQ.correct]}</span></p>
+                )}
               </>
             )}
             </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Playing screen - need a question to display
+  if (!currentQ) {
+    return (
+      <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
+        <SoftChristmasLights />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/40" />
+        <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 overflow-hidden">
+          <div className="text-center">
+            <div className="text-6xl animate-bounce mb-4">🎄</div>
+            <p className="text-white text-xl">Loading question...</p>
           </div>
         </div>
       </div>
@@ -256,7 +280,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
           <div className="w-full max-w-md mx-auto">
             <div className="question-banner p-4 rounded-2xl shadow-lg">
               <p className="text-yellow-300/80 text-sm text-center mb-2">
-                Q{(game.current_question ?? 0) + 1} / {Math.min(totalQuestions, triviaQuestions.length)}
+                Q{(game.current_question ?? 0) + 1} / {totalQuestions}
               </p>
               <p className="text-xl sm:text-2xl text-white text-center font-bold leading-snug festive-title">{currentQ.question}</p>
             </div>
@@ -322,7 +346,7 @@ function LoadingScreen() {
 }
 
 function JoinScreen({ game, teamName, setTeamName, selectedColor, setSelectedColor, isJoining, error, joinGame }: {
-  game: Game
+  game: GameWithQuestion
   teamName: string
   setTeamName: (v: string) => void
   selectedColor: number
