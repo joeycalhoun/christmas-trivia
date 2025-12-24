@@ -321,7 +321,12 @@ function JoinScreen({ game, teamName, setTeamName, selectedColor, setSelectedCol
             <label className="text-yellow-300 text-sm mb-3 block font-medium">Team Color</label>
             <div className="flex flex-wrap gap-3 justify-center">
               {TEAM_COLORS.map((color, index) => (
-                <button key={color.name} onClick={() => setSelectedColor(index)} className={`w-12 h-12 rounded-full bg-gradient-to-br ${color.bg} border-4 transition-all active:scale-90 ${selectedColor === index ? 'scale-110 border-white shadow-lg shadow-white/30' : 'border-transparent'}`} />
+                <button 
+                  key={color.name} 
+                  onClick={() => setSelectedColor(index)} 
+                  className={`w-12 h-12 rounded-full border-4 transition-all active:scale-90 ${selectedColor === index ? 'scale-110 border-white shadow-lg shadow-white/30' : 'border-transparent'}`}
+                  style={{ background: `linear-gradient(to bottom right, ${color.hex[0]}, ${color.hex[1]})` }}
+                />
               ))}
             </div>
           </div>

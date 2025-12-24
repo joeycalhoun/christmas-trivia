@@ -4,6 +4,18 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/lib/**/*.{js,ts}',
+  ],
+  safelist: [
+    // Team colors - ensure these are always included
+    'from-red-700', 'to-red-600', 'border-red-400',
+    'from-green-700', 'to-green-600', 'border-green-400',
+    'from-blue-700', 'to-blue-600', 'border-blue-400',
+    'from-yellow-600', 'to-yellow-500', 'border-yellow-400',
+    'from-purple-700', 'to-purple-600', 'border-purple-400',
+    'from-pink-600', 'to-pink-500', 'border-pink-400',
+    'from-cyan-600', 'to-cyan-500', 'border-cyan-400',
+    'from-orange-600', 'to-orange-500', 'border-orange-400',
   ],
   theme: {
     extend: {
