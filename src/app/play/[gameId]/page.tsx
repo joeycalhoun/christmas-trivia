@@ -8,6 +8,9 @@ import { Game, Team, Answer, DynamicQuestion, getTeamColor, TEAM_COLORS } from '
 // Extended game type to include the question data
 interface GameWithQuestion extends Game {
   current_question_data?: DynamicQuestion | null
+  read_aloud_enabled?: boolean
+  read_aloud_seconds?: number
+  answering_enabled?: boolean
 }
 
 export default function PlayPage({ params }: { params: Promise<{ gameId: string }> }) {
@@ -65,11 +68,19 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     return () => { supabase.removeChannel(channel) }
   }, [gameId, team?.id, game?.current_question])
 
+  // Main timer - only runs when answering is enabled and game is playing
   useEffect(() => {
-    if (game?.status !== 'playing' || hasAnswered) return
+    if (game?.status !== 'playing' || hasAnswered || !game.answering_enabled) return
     const timer = setInterval(() => setTimeLeft(prev => prev <= 1 ? 0 : prev - 1), 1000)
     return () => clearInterval(timer)
-  }, [game?.status, hasAnswered])
+  }, [game?.status, hasAnswered, game?.answering_enabled])
+  
+  // Reset timer when answering becomes enabled
+  useEffect(() => {
+    if (game?.status === 'playing' && game.answering_enabled) {
+      setTimeLeft(game.question_time_seconds || 20)
+    }
+  }, [game?.answering_enabled, game?.status, game?.question_time_seconds])
 
   const joinGame = async () => {
     if (!teamName.trim()) { setError('Please enter a team name'); return }
@@ -84,7 +95,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   }
 
   const submitAnswer = async (answerIndex: number) => {
-    if (hasAnswered || !team || !game || game.status !== 'playing' || !game.current_question_data) return
+    if (hasAnswered || !team || !game || game.status !== 'playing' || !game.current_question_data || !game.answering_enabled) return
     setHasAnswered(true)
     
     const currentQ = game.current_question_data
@@ -256,6 +267,9 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     )
   }
 
+  // Grace period - host is reading question aloud
+  const isGracePeriod = game.status === 'playing' && game.answering_enabled === false
+
   // Playing screen
   return (
     <div className="h-[100dvh] wood-background relative overflow-hidden safe-area-inset">
@@ -270,8 +284,8 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
                 <span className="text-yellow-300 font-bold text-lg">{team.score}</span>
               </div>
             </div>
-            <div className={`px-5 py-2 rounded-xl font-bold text-2xl ${timeLeft <= 5 && !hasAnswered ? 'bg-red-600 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
-              {timeLeft}
+            <div className={`px-5 py-2 rounded-xl font-bold text-2xl ${isGracePeriod ? 'bg-yellow-500/30 text-yellow-300' : timeLeft <= 5 && !hasAnswered ? 'bg-red-600 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
+              {isGracePeriod ? '📖' : timeLeft}
             </div>
           </div>
         </header>
@@ -289,7 +303,21 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
 
         <div className="flex-1 flex flex-col px-4 pb-4 min-h-0 overflow-hidden">
           <div className="w-full max-w-md mx-auto flex-1 flex flex-col min-h-0 overflow-hidden">
-            {hasAnswered ? (
+            {isGracePeriod ? (
+              /* Grace period - waiting for host to finish reading */
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-8xl mb-6 animate-pulse">📖</div>
+                  <p className="text-3xl font-bold text-yellow-300 mb-2 festive-title">Get Ready!</p>
+                  <p className="text-white/70 text-lg">Host is reading the question...</p>
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0s'}} />
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-bounce" style={{animationDelay: '0.4s'}} />
+                  </div>
+                </div>
+              </div>
+            ) : hasAnswered ? (
               /* Waiting for reveal - no feedback yet */
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">

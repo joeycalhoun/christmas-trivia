@@ -40,6 +40,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const [winners, setWinners] = useState<Array<{team: Team, points: number, position: number}>>([])
   const [currentQuestion, setCurrentQuestion] = useState<DynamicQuestion | null>(null)
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(false)
+  const [graceTimeLeft, setGraceTimeLeft] = useState<number | null>(null)
+  const [isGracePeriod, setIsGracePeriod] = useState(false)
   
   const gameRef = useRef<Game | null>(null)
   const settingsRef = useRef(DEFAULT_SETTINGS)
@@ -96,6 +98,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       const loadedSettings = {
         questionTime: gameData.question_time_seconds || DEFAULT_SETTINGS.questionTime,
         totalQuestions: gameData.total_questions || DEFAULT_SETTINGS.totalQuestions,
+        readAloudEnabled: gameData.read_aloud_enabled ?? DEFAULT_SETTINGS.readAloudEnabled,
+        readAloudSeconds: gameData.read_aloud_seconds || DEFAULT_SETTINGS.readAloudSeconds,
       }
       setSettings(loadedSettings)
       setTimeLeft(loadedSettings.questionTime)
@@ -197,8 +201,9 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     }, REVEAL_ANSWER_TIME)
   }
 
+  // Main answer timer - only runs when not in grace period
   useEffect(() => {
-    if (game?.status !== 'playing') return
+    if (game?.status !== 'playing' || isGracePeriod) return
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -209,15 +214,55 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [game?.status, gameId])
+  }, [game?.status, gameId, isGracePeriod])
+
+  // When grace period ends, start the main timer
+  useEffect(() => {
+    if (!isGracePeriod && graceTimeLeft === null && game?.status === 'playing') {
+      setTimeLeft(settingsRef.current.questionTime)
+    }
+  }, [isGracePeriod, graceTimeLeft, game?.status])
 
   const saveSettings = async () => {
-    await supabase.from('games').update({ question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions }).eq('id', gameId)
-    setGame(prev => prev ? { ...prev, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions } : null)
+    await supabase.from('games').update({ 
+      question_time_seconds: settings.questionTime, 
+      total_questions: settings.totalQuestions,
+      read_aloud_enabled: settings.readAloudEnabled,
+      read_aloud_seconds: settings.readAloudSeconds,
+    }).eq('id', gameId)
+    setGame(prev => prev ? { 
+      ...prev, 
+      question_time_seconds: settings.questionTime, 
+      total_questions: settings.totalQuestions,
+      read_aloud_enabled: settings.readAloudEnabled,
+      read_aloud_seconds: settings.readAloudSeconds,
+    } : null)
     if (pausedTimeRef.current !== null && pausedTimeRef.current > settings.questionTime) pausedTimeRef.current = settings.questionTime
     setShowSettings(false)
     if (game?.status === 'paused') setShowMenu(true)
   }
+
+  // Grace period timer effect
+  useEffect(() => {
+    if (!isGracePeriod || graceTimeLeft === null || graceTimeLeft <= 0) return
+    
+    const timer = setInterval(() => {
+      setGraceTimeLeft(prev => {
+        if (prev === null || prev <= 1) {
+          // Grace period ended - enable answering
+          setIsGracePeriod(false)
+          supabase.from('games').update({ 
+            answering_enabled: true,
+            question_start_time: new Date().toISOString() 
+          }).eq('id', gameId)
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
+    
+    return () => clearInterval(timer)
+  }, [isGracePeriod, graceTimeLeft, gameId])
 
   const startGame = async () => {
     if (teams.length < 1) return
@@ -235,18 +280,29 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     setWinners([])
     nextQuestionRef.current = null
     
+    const useGracePeriod = settings.readAloudEnabled
+    
     await supabase.from('games').update({ 
       status: 'playing', 
       current_question: 0, 
       current_question_data: question,
-      question_start_time: new Date().toISOString(), 
+      question_start_time: useGracePeriod ? null : new Date().toISOString(), 
       question_time_seconds: settings.questionTime, 
-      total_questions: settings.totalQuestions 
+      total_questions: settings.totalQuestions,
+      read_aloud_enabled: settings.readAloudEnabled,
+      read_aloud_seconds: settings.readAloudSeconds,
+      answering_enabled: !useGracePeriod,
     }).eq('id', gameId)
     
     await supabase.from('teams').update({ has_answered: false }).eq('game_id', gameId)
-    setGame(prev => prev ? { ...prev, status: 'playing', current_question: 0, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions } : null)
-    setTimeLeft(settings.questionTime)
+    setGame(prev => prev ? { ...prev, status: 'playing', current_question: 0, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions, read_aloud_enabled: settings.readAloudEnabled, read_aloud_seconds: settings.readAloudSeconds, answering_enabled: !useGracePeriod } : null)
+    
+    if (useGracePeriod) {
+      setIsGracePeriod(true)
+      setGraceTimeLeft(settings.readAloudSeconds)
+    } else {
+      setTimeLeft(settings.questionTime)
+    }
     
     // Pre-fetch the next question in background
     prefetchNextQuestion(0)
@@ -280,6 +336,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     hasRevealedRef.current = false
     setRevealPhase('none')
     setWinners([])
+    setIsGracePeriod(false)
+    setGraceTimeLeft(null)
     
     const nextQ = (currentGame?.current_question ?? 0) + 1
     if (nextQ >= currentSettings.totalQuestions) {
@@ -307,17 +365,26 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     nextQuestionRef.current = null
     setCurrentQuestion(question)
     
+    const useGracePeriod = currentSettings.readAloudEnabled
+    
     await supabase.from('teams').update({ has_answered: false }).eq('game_id', gameId)
     setTeams(prev => prev.map(t => ({ ...t, has_answered: false })))
     await supabase.from('games').update({ 
       status: 'playing', 
       current_question: nextQ, 
       current_question_data: question,
-      question_start_time: new Date().toISOString(), 
-      question_time_seconds: currentSettings.questionTime 
+      question_start_time: useGracePeriod ? null : new Date().toISOString(), 
+      question_time_seconds: currentSettings.questionTime,
+      answering_enabled: !useGracePeriod,
     }).eq('id', gameId)
-    setGame(prev => prev ? { ...prev, status: 'playing', current_question: nextQ, question_time_seconds: currentSettings.questionTime } : null)
-    setTimeLeft(currentSettings.questionTime)
+    setGame(prev => prev ? { ...prev, status: 'playing', current_question: nextQ, question_time_seconds: currentSettings.questionTime, answering_enabled: !useGracePeriod } : null)
+    
+    if (useGracePeriod) {
+      setIsGracePeriod(true)
+      setGraceTimeLeft(currentSettings.readAloudSeconds)
+    } else {
+      setTimeLeft(currentSettings.questionTime)
+    }
     
     // Pre-fetch the next question in background
     prefetchNextQuestion(nextQ)
@@ -380,7 +447,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         <div className="absolute inset-0 bg-black/85 z-50 flex items-center justify-center backdrop-blur-sm">
           <div className="question-banner p-10 rounded-3xl max-w-md w-full mx-4 shadow-2xl">
             <h2 className="text-4xl font-bold text-white text-center mb-8" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>⚙️ Settings</h2>
-            <div className="space-y-8">
+            <div className="space-y-6">
               <div>
                 <label className="text-yellow-300 text-lg mb-3 block">Time per Question: <span className="text-white font-bold text-2xl">{settings.questionTime}s</span></label>
                 <input type="range" min="10" max="60" step="5" value={settings.questionTime} onChange={(e) => setSettings(s => ({ ...s, questionTime: parseInt(e.target.value) }))} className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400" />
@@ -388,6 +455,24 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
               <div>
                 <label className="text-yellow-300 text-lg mb-3 block">Questions: <span className="text-white font-bold text-2xl">{settings.totalQuestions}</span></label>
                 <input type="range" min="5" max="50" step="1" value={settings.totalQuestions} onChange={(e) => setSettings(s => ({ ...s, totalQuestions: parseInt(e.target.value) }))} className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400" />
+              </div>
+              <div className="border-t border-yellow-400/30 pt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-yellow-300 text-lg">📖 Read Aloud Mode</label>
+                  <button 
+                    onClick={() => setSettings(s => ({ ...s, readAloudEnabled: !s.readAloudEnabled }))}
+                    className={`w-14 h-8 rounded-full transition-colors ${settings.readAloudEnabled ? 'bg-green-500' : 'bg-gray-600'} relative`}
+                  >
+                    <span className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-transform ${settings.readAloudEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {settings.readAloudEnabled && (
+                  <div className="mt-4">
+                    <label className="text-yellow-300/80 text-sm mb-2 block">Grace Period: <span className="text-white font-bold">{settings.readAloudSeconds}s</span></label>
+                    <input type="range" min="3" max="15" step="1" value={settings.readAloudSeconds} onChange={(e) => setSettings(s => ({ ...s, readAloudSeconds: parseInt(e.target.value) }))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400" />
+                  </div>
+                )}
+                <p className="text-gray-400 text-xs mt-2">Adds time before answers are accepted so you can read the question aloud.</p>
               </div>
               <div className="bg-black/40 p-4 rounded-xl border border-yellow-400/30">
                 <p className="text-yellow-300 text-sm font-bold">🏆 Points: 1st: 300 • 2nd: 250 • 3rd: 200...</p>
@@ -428,7 +513,12 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
             )}
             <div className="candy-cane-border shadow-lg">
               <div className="bg-gray-900 px-8 py-4 rounded-xl min-w-[140px] text-center">
-                {game.status === 'playing' ? (
+                {game.status === 'playing' && isGracePeriod && graceTimeLeft !== null ? (
+                  <div className="flex flex-col items-center">
+                    <span className="text-lg text-yellow-300 font-bold">📖 READ</span>
+                    <span className="text-5xl font-bold text-yellow-400" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{graceTimeLeft}</span>
+                  </div>
+                ) : game.status === 'playing' ? (
                   <span className={`text-6xl font-bold ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`} style={{ fontFamily: 'Cinzel Decorative, serif' }}>{timeLeft}</span>
                 ) : game.status === 'paused' ? (
                   <span className="text-2xl text-yellow-400 font-bold">PAUSED</span>

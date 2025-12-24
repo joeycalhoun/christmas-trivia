@@ -6,6 +6,9 @@ export interface Game {
   question_start_time: string | null
   question_time_seconds: number
   total_questions: number
+  read_aloud_enabled: boolean
+  read_aloud_seconds: number
+  answering_enabled: boolean
   created_at: string
 }
 
@@ -34,6 +37,8 @@ export interface Answer {
 export interface GameSettings {
   questionTime: number
   totalQuestions: number
+  readAloudEnabled: boolean
+  readAloudSeconds: number
 }
 
 export interface DynamicQuestion {
@@ -46,6 +51,8 @@ export interface DynamicQuestion {
 export const DEFAULT_SETTINGS: GameSettings = {
   questionTime: 20,
   totalQuestions: 10,
+  readAloudEnabled: false,
+  readAloudSeconds: 7,
 }
 
 export const TEAM_COLORS = [
