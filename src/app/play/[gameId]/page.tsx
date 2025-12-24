@@ -8,9 +8,6 @@ import { Game, Team, Answer, DynamicQuestion, getTeamColor, TEAM_COLORS } from '
 // Extended game type to include the question data
 interface GameWithQuestion extends Game {
   current_question_data?: DynamicQuestion | null
-  read_aloud_enabled?: boolean
-  read_aloud_seconds?: number
-  answering_enabled?: boolean
 }
 
 export default function PlayPage({ params }: { params: Promise<{ gameId: string }> }) {
