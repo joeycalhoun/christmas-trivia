@@ -461,9 +461,9 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   <label className="text-yellow-300 text-lg">📖 Read Aloud Mode</label>
                   <button 
                     onClick={() => setSettings(s => ({ ...s, readAloudEnabled: !s.readAloudEnabled }))}
-                    className={`w-14 h-8 rounded-full transition-colors ${settings.readAloudEnabled ? 'bg-green-500' : 'bg-gray-600'} relative`}
+                    className={`w-12 h-7 rounded-full transition-colors ${settings.readAloudEnabled ? 'bg-green-500' : 'bg-gray-600'} relative flex items-center`}
                   >
-                    <span className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-transform ${settings.readAloudEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+                    <span className={`w-5 h-5 rounded-full bg-white shadow-md transition-all duration-200 ${settings.readAloudEnabled ? 'ml-6' : 'ml-1'}`} />
                   </button>
                 </div>
                 {settings.readAloudEnabled && (
