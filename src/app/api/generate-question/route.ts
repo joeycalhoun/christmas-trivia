@@ -16,11 +16,12 @@ type Difficulty = typeof DIFFICULTIES[number]
 
 // Rotate through difficulties to ensure variety
 function getDifficultyForQuestion(questionNumber: number): Difficulty {
-  // Pattern: easy, medium, easy, hard, medium, easy, very_hard, medium, hard, easy...
+  // Pattern: More challenging with fewer easy questions
+  // easy, medium, hard, medium, very_hard, medium, hard, medium, easy, hard
   const pattern: Difficulty[] = [
-    'easy', 'medium', 'easy', 'hard', 
-    'medium', 'easy', 'very_hard', 'medium',
-    'hard', 'easy'
+    'easy', 'medium', 'hard', 'medium', 
+    'very_hard', 'medium', 'hard', 'medium',
+    'easy', 'hard'
   ]
   return pattern[questionNumber % pattern.length]
 }
@@ -29,16 +30,26 @@ export async function POST(request: Request) {
   try {
     const { questionNumber = 0 } = await request.json()
     
-    // Get the last 20 questions to avoid repetition
+    // Get the last 30 questions to avoid repetition (across ALL games)
     const { data: recentQuestions } = await supabase
       .from('recent_questions')
-      .select('question_text, difficulty')
+      .select('question_text, difficulty, answers, correct_index')
       .order('asked_at', { ascending: false })
-      .limit(20)
+      .limit(30)
     
-    const recentQuestionsList = recentQuestions?.map(q => `- ${q.question_text} (${q.difficulty})`) || []
+    // Build avoid list with both questions AND their correct answers
+    const recentQuestionsList = recentQuestions?.map(q => {
+      const correctAnswer = q.answers?.[q.correct_index] || ''
+      return `- "${q.question_text}" (Answer: ${correctAnswer})`
+    }) || []
+    
+    // Extract unique correct answers to explicitly avoid
+    const recentCorrectAnswers = [...new Set(
+      recentQuestions?.map(q => q.answers?.[q.correct_index]).filter(Boolean) || []
+    )]
+    
     const avoidList = recentQuestionsList.length > 0 
-      ? `\n\nDO NOT generate any of these recently asked questions:\n${recentQuestionsList.join('\n')}`
+      ? `\n\nDO NOT generate any of these recently asked questions OR any questions with the same correct answers:\n${recentQuestionsList.join('\n')}\n\nSpecifically, DO NOT create questions where the answer is any of these: ${recentCorrectAnswers.join(', ')}`
       : ''
     
     const difficulty = getDifficultyForQuestion(questionNumber)
@@ -60,7 +71,9 @@ Requirements:
 - Provide exactly 4 answer options
 - Only ONE answer should be correct
 - Wrong answers should be plausible but clearly incorrect
-- Make the question interesting and fun${avoidList}
+- Make the question interesting and fun
+- IMPORTANT: Do NOT generate any question that is similar to or a rephrasing of the avoided questions below
+- IMPORTANT: Do NOT generate any question where the correct answer matches any of the avoided answers below (this prevents essentially the same question with different wording)${avoidList}
 
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
@@ -111,12 +124,12 @@ Where "correct" is the index (0-3) of the correct answer.`
       correct_index: questionData.correct,
     })
     
-    // Clean up old questions (keep only last 50)
+    // Clean up old questions (keep only last 100)
     const { data: oldQuestions } = await supabase
       .from('recent_questions')
       .select('id')
       .order('asked_at', { ascending: false })
-      .range(50, 1000)
+      .range(100, 1000)
     
     if (oldQuestions && oldQuestions.length > 0) {
       const idsToDelete = oldQuestions.map(q => q.id)
