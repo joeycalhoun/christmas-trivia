@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
@@ -18,7 +18,19 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  
+  // Use refs to avoid stale closures in callbacks
+  const gameRef = useRef<Game | null>(null)
+  const teamsRef = useRef<Team[]>([])
+  const answersRef = useRef<Answer[]>([])
+  const settingsRef = useRef(DEFAULT_SETTINGS)
   const pausedTimeRef = useRef<number | null>(null)
+
+  // Keep refs in sync
+  useEffect(() => { gameRef.current = game }, [game])
+  useEffect(() => { teamsRef.current = teams }, [teams])
+  useEffect(() => { answersRef.current = answers }, [answers])
+  useEffect(() => { settingsRef.current = settings }, [settings])
 
   useEffect(() => {
     setHostUrl(window.location.origin)
@@ -92,7 +104,86 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     }
   }, [gameId])
 
-  // Timer logic
+  // Handle revealing answers and scoring - fetches fresh data to avoid stale closures
+  const handleReveal = async () => {
+    const currentGame = gameRef.current
+    if (!currentGame) return
+    
+    const currentQuestion = currentGame.current_question ?? 0
+    
+    // Fetch fresh answers from database to ensure we have all of them
+    const { data: freshAnswers } = await supabase
+      .from('answers')
+      .select()
+      .eq('game_id', gameId)
+      .eq('question_index', currentQuestion)
+      .order('answered_at', { ascending: true })
+    
+    if (!freshAnswers) return
+    
+    // Fetch fresh teams
+    const { data: freshTeams } = await supabase
+      .from('teams')
+      .select()
+      .eq('game_id', gameId)
+    
+    if (!freshTeams) return
+    
+    const correctAnswers = freshAnswers.filter(a => a.is_correct)
+    
+    console.log(`Revealing Q${currentQuestion}: ${freshAnswers.length} answers, ${correctAnswers.length} correct`)
+    
+    // Award points based on order of correct answers
+    for (let i = 0; i < correctAnswers.length; i++) {
+      const basePoints = 100
+      const speedBonus = Math.max(0, (correctAnswers.length - i) * 25)
+      const points = basePoints + speedBonus
+      
+      // Update answer with points
+      await supabase
+        .from('answers')
+        .update({ points_earned: points })
+        .eq('id', correctAnswers[i].id)
+      
+      // Find team and update score
+      const team = freshTeams.find(t => t.id === correctAnswers[i].team_id)
+      if (team) {
+        const newScore = team.score + points
+        console.log(`Awarding ${points} points to ${team.name}, new score: ${newScore}`)
+        
+        await supabase
+          .from('teams')
+          .update({ score: newScore })
+          .eq('id', team.id)
+        
+        // Update local state
+        setTeams(prev => prev.map(t => 
+          t.id === team.id ? { ...t, score: newScore } : t
+        ))
+      }
+    }
+    
+    // Update local answers state
+    setAnswers(prev => prev.map(a => {
+      const updated = freshAnswers.find(fa => fa.id === a.id)
+      return updated ? { ...a, points_earned: updated.points_earned } : a
+    }))
+    
+    // Update game status to revealing
+    await supabase
+      .from('games')
+      .update({ status: 'revealing' })
+      .eq('id', gameId)
+    
+    setGame(prev => prev ? { ...prev, status: 'revealing' } : null)
+    
+    // Auto-advance after reveal time
+    setTimeout(() => {
+      nextQuestion()
+    }, REVEAL_TIME_SECONDS * 1000)
+  }
+
+  // Timer logic - uses ref for settings to get current value
   useEffect(() => {
     if (game?.status !== 'playing') return
     
@@ -107,7 +198,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     }, 1000)
     
     return () => clearInterval(timer)
-  }, [game?.status])
+  }, [game?.status, gameId])
 
   const saveSettings = async () => {
     // Save to database
@@ -119,20 +210,16 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       })
       .eq('id', gameId)
     
-    // Update local game state immediately
+    // Update local game state
     setGame(prev => prev ? {
       ...prev,
       question_time_seconds: settings.questionTime,
       total_questions: settings.totalQuestions,
     } : null)
     
-    // If game is paused and we have a pausedTimeRef, update it to new max
-    // This ensures resume uses the new time setting
-    if (game?.status === 'paused' && pausedTimeRef.current !== null) {
-      // If current paused time is greater than new setting, cap it
-      if (pausedTimeRef.current > settings.questionTime) {
-        pausedTimeRef.current = settings.questionTime
-      }
+    // If paused and we have remaining time greater than new setting, cap it
+    if (pausedTimeRef.current !== null && pausedTimeRef.current > settings.questionTime) {
+      pausedTimeRef.current = settings.questionTime
     }
     
     setShowSettings(false)
@@ -183,6 +270,12 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
   }
 
   const resumeGame = async () => {
+    // Use paused time, but cap at current settings
+    const resumeTime = Math.min(
+      pausedTimeRef.current ?? settings.questionTime, 
+      settings.questionTime
+    )
+    
     await supabase
       .from('games')
       .update({ 
@@ -198,8 +291,6 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       question_time_seconds: settings.questionTime,
     } : null)
     
-    // Use the paused time, capped at current settings
-    const resumeTime = Math.min(pausedTimeRef.current || settings.questionTime, settings.questionTime)
     setTimeLeft(resumeTime)
     pausedTimeRef.current = null
     setShowMenu(false)
@@ -215,51 +306,11 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
     setShowMenu(false)
   }
 
-  const handleReveal = useCallback(async () => {
-    const currentQuestion = game?.current_question ?? 0
-    const questionAnswers = answers.filter(a => a.question_index === currentQuestion)
-    const correctAnswers = questionAnswers
-      .filter(a => a.is_correct)
-      .sort((a, b) => new Date(a.answered_at).getTime() - new Date(b.answered_at).getTime())
-    
-    for (let i = 0; i < correctAnswers.length; i++) {
-      const basePoints = 100
-      const speedBonus = Math.max(0, (correctAnswers.length - i) * 25)
-      const points = basePoints + speedBonus
-      
-      await supabase
-        .from('answers')
-        .update({ points_earned: points })
-        .eq('id', correctAnswers[i].id)
-      
-      const team = teams.find(t => t.id === correctAnswers[i].team_id)
-      if (team) {
-        await supabase
-          .from('teams')
-          .update({ score: team.score + points })
-          .eq('id', team.id)
-        
-        setTeams(prev => prev.map(t => 
-          t.id === team.id ? { ...t, score: t.score + points } : t
-        ))
-      }
-    }
-    
-    await supabase
-      .from('games')
-      .update({ status: 'revealing' })
-      .eq('id', gameId)
-    
-    setGame(prev => prev ? { ...prev, status: 'revealing' } : null)
-    
-    setTimeout(() => {
-      nextQuestion()
-    }, REVEAL_TIME_SECONDS * 1000)
-  }, [game?.current_question, answers, teams, gameId])
-
   const nextQuestion = async () => {
-    const totalQ = settings.totalQuestions
-    const nextQ = (game?.current_question ?? 0) + 1
+    const currentSettings = settingsRef.current
+    const currentGame = gameRef.current
+    const totalQ = currentSettings.totalQuestions
+    const nextQ = (currentGame?.current_question ?? 0) + 1
     
     if (nextQ >= Math.min(totalQ, triviaQuestions.length)) {
       await supabase
@@ -283,12 +334,20 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       .update({ 
         status: 'playing', 
         current_question: nextQ,
-        question_start_time: new Date().toISOString()
+        question_start_time: new Date().toISOString(),
+        question_time_seconds: currentSettings.questionTime,
       })
       .eq('id', gameId)
     
-    setGame(prev => prev ? { ...prev, status: 'playing', current_question: nextQ } : null)
-    setTimeLeft(settings.questionTime)
+    setGame(prev => prev ? { 
+      ...prev, 
+      status: 'playing', 
+      current_question: nextQ,
+      question_time_seconds: currentSettings.questionTime,
+    } : null)
+    
+    // Use current settings for new question timer
+    setTimeLeft(currentSettings.questionTime)
   }
 
   const currentQ = triviaQuestions[game?.current_question ?? 0]
@@ -404,6 +463,10 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   <span>{triviaQuestions.length}</span>
                 </div>
               </div>
+              
+              <p className="text-gray-300 text-sm text-center">
+                ⚠️ New time will apply to the next question
+              </p>
               
               <div className="flex gap-4 pt-4">
                 <button
@@ -631,8 +694,8 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   </p>
                 </div>
 
-                {/* Answers Grid - SMALLER */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Answers Grid - BIGGER */}
+                <div className="grid grid-cols-2 gap-4 flex-1">
                   {currentQ.answers.map((answer, index) => {
                     const colors = [
                       { bg: 'from-green-700 to-green-600', border: 'border-green-400' },
@@ -647,18 +710,18 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                       <div
                         key={index}
                         className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border}
-                          border-3 rounded-xl p-4 flex items-center justify-center
-                          transition-all duration-500 min-h-[80px]
+                          border-4 rounded-2xl p-5 flex items-center justify-center
+                          transition-all duration-500
                           ${showCorrect && isCorrect ? 'ring-4 ring-green-400 scale-105' : ''}
                           ${showCorrect && !isCorrect ? 'opacity-50' : ''}`}
                       >
                         <span 
-                          className="text-2xl font-bold text-white text-center"
+                          className="text-3xl font-bold text-white text-center"
                           style={{ fontFamily: 'Mountains of Christmas, cursive' }}
                         >
-                          <span className="text-yellow-300 mr-2">{String.fromCharCode(65 + index)})</span>
+                          <span className="text-yellow-300 mr-3">{String.fromCharCode(65 + index)})</span>
                           {answer}
-                          {showCorrect && isCorrect && <span className="ml-2">✓</span>}
+                          {showCorrect && isCorrect && <span className="ml-3">✓</span>}
                         </span>
                       </div>
                     )
