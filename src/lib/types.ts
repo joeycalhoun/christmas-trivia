@@ -1,9 +1,11 @@
 export interface Game {
   id: string
   code: string
-  status: 'waiting' | 'playing' | 'revealing' | 'finished'
+  status: 'waiting' | 'playing' | 'paused' | 'revealing' | 'finished'
   current_question: number
   question_start_time: string | null
+  question_time_seconds: number
+  total_questions: number
   created_at: string
 }
 
@@ -29,6 +31,16 @@ export interface Answer {
   answered_at: string
 }
 
+export interface GameSettings {
+  questionTime: number
+  totalQuestions: number
+}
+
+export const DEFAULT_SETTINGS: GameSettings = {
+  questionTime: 20,
+  totalQuestions: 10,
+}
+
 export const TEAM_COLORS = [
   { name: 'red', bg: 'from-red-700 to-red-600', border: 'border-red-400', text: 'text-red-400' },
   { name: 'green', bg: 'from-green-700 to-green-600', border: 'border-green-400', text: 'text-green-400' },
@@ -42,3 +54,4 @@ export const TEAM_COLORS = [
 
 export const getTeamColor = (index: number) => TEAM_COLORS[index % TEAM_COLORS.length]
 
+export const REVEAL_TIME_SECONDS = 5

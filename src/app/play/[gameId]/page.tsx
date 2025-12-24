@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { triviaQuestions, QUESTION_TIME_SECONDS } from '@/lib/questions'
+import { triviaQuestions } from '@/lib/questions'
 import { Game, Team, getTeamColor, TEAM_COLORS } from '@/lib/types'
 
 export default function PlayPage({ params }: { params: Promise<{ gameId: string }> }) {
@@ -17,7 +17,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   const [hasAnswered, setHasAnswered] = useState(false)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [answerResult, setAnswerResult] = useState<'correct' | 'wrong' | null>(null)
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_SECONDS)
+  const [timeLeft, setTimeLeft] = useState(20)
   const [error, setError] = useState('')
 
   // Load game data
@@ -35,8 +35,8 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
       }
       
       setGame(data)
+      setTimeLeft(data.question_time_seconds || 20)
       
-      // Check if we already have a team in this game (from localStorage)
       const savedTeamId = localStorage.getItem(`team-${gameId}`)
       if (savedTeamId) {
         const { data: teamData } = await supabase
@@ -64,12 +64,19 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
           const newGame = payload.new as Game
           setGame(newGame)
           
-          // Reset answer state when question changes or game restarts
           if (newGame.status === 'playing') {
             setHasAnswered(false)
             setSelectedAnswer(null)
             setAnswerResult(null)
-            setTimeLeft(QUESTION_TIME_SECONDS)
+            setTimeLeft(newGame.question_time_seconds || 20)
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'teams', filter: `id=eq.${team?.id}` },
+        (payload) => {
+          if (payload.new) {
+            setTeam(payload.new as Team)
           }
         }
       )
@@ -78,17 +85,14 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [gameId])
+  }, [gameId, team?.id])
 
-  // Timer for player view
+  // Timer
   useEffect(() => {
     if (game?.status !== 'playing' || hasAnswered) return
     
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) return 0
-        return prev - 1
-      })
+      setTimeLeft(prev => prev <= 1 ? 0 : prev - 1)
     }, 1000)
     
     return () => clearInterval(timer)
@@ -136,10 +140,9 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     const isCorrect = answerIndex === currentQ.correct
     setAnswerResult(isCorrect ? 'correct' : 'wrong')
     
-    // Calculate time taken
     const questionStartTime = game.question_start_time 
       ? new Date(game.question_start_time).getTime()
-      : Date.now() - (QUESTION_TIME_SECONDS - timeLeft) * 1000
+      : Date.now() - ((game.question_time_seconds || 20) - timeLeft) * 1000
     const timeTaken = Date.now() - questionStartTime
     
     try {
@@ -154,7 +157,6 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
           time_taken_ms: timeTaken
         })
       
-      // Update team's has_answered
       await supabase
         .from('teams')
         .update({ has_answered: true })
@@ -166,7 +168,7 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
 
   if (!game) {
     return (
-      <div className="min-h-screen wood-background flex items-center justify-center p-4">
+      <div className="min-h-[100dvh] wood-background flex items-center justify-center p-4">
         <div className="text-white text-xl">Loading...</div>
       </div>
     )
@@ -175,64 +177,66 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Join screen
   if (!team) {
     return (
-      <div className="min-h-screen wood-background flex items-center justify-center p-4">
-        <div className="question-banner p-6 rounded-2xl w-full max-w-md">
+      <div className="min-h-[100dvh] wood-background flex items-center justify-center p-4 safe-area-inset">
+        <div className="question-banner p-6 rounded-2xl w-full max-w-sm">
           <h1 
-            className="text-3xl font-bold text-white text-center mb-6"
+            className="text-3xl font-bold text-white text-center mb-4"
             style={{ fontFamily: 'Mountains of Christmas, cursive' }}
           >
             🎄 Join Game 🎄
           </h1>
           
-          <div className="mb-4">
-            <label className="text-yellow-300 text-sm mb-2 block">Game Code</label>
-            <div 
-              className="text-3xl font-bold text-white text-center tracking-widest"
+          <div className="mb-4 text-center">
+            <span className="text-yellow-300 text-sm">Game Code</span>
+            <p 
+              className="text-3xl font-bold text-white tracking-widest"
               style={{ fontFamily: 'Cinzel Decorative, serif' }}
             >
               {game.code}
-            </div>
+            </p>
           </div>
           
           <div className="mb-4">
-            <label className="text-yellow-300 text-sm mb-2 block">Your Team Name</label>
+            <label className="text-yellow-300 text-sm mb-1 block">Your Team Name</label>
             <input
               type="text"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               placeholder="Enter team name..."
               maxLength={20}
-              className="w-full text-xl py-3 px-4 rounded-xl
+              className="w-full text-lg py-4 px-4 rounded-xl
                 bg-gray-900 text-white border-4 border-yellow-400 
                 placeholder-gray-500"
               autoFocus
+              autoComplete="off"
+              autoCapitalize="words"
             />
           </div>
           
-          <div className="mb-6">
+          <div className="mb-5">
             <label className="text-yellow-300 text-sm mb-2 block">Pick Your Color</label>
-            <div className="flex flex-wrap gap-2 justify-center">
+            <div className="flex flex-wrap gap-3 justify-center">
               {TEAM_COLORS.map((color, index) => (
                 <button
                   key={color.name}
                   onClick={() => setSelectedColor(index)}
-                  className={`w-10 h-10 rounded-full bg-gradient-to-br ${color.bg} border-4 
-                    transition-transform ${selectedColor === index ? 'scale-125 border-white' : 'border-transparent'}`}
+                  className={`w-12 h-12 rounded-full bg-gradient-to-br ${color.bg} border-4 
+                    transition-all active:scale-95 ${selectedColor === index ? 'scale-110 border-white ring-2 ring-white' : 'border-transparent'}`}
                 />
               ))}
             </div>
           </div>
           
           {error && (
-            <div className="mb-4 text-red-400 text-center">{error}</div>
+            <div className="mb-4 text-red-400 text-center text-sm">{error}</div>
           )}
           
           <button
             onClick={joinGame}
             disabled={isJoining || !teamName.trim()}
             className="w-full bg-gradient-to-br from-green-600 to-green-700 text-white text-2xl font-bold 
-              py-4 px-6 rounded-xl border-4 border-yellow-400 shadow-lg 
-              hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              py-5 px-6 rounded-xl border-4 border-yellow-400 shadow-lg 
+              active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ fontFamily: 'Mountains of Christmas, cursive' }}
           >
             {isJoining ? '🎄 Joining...' : '🎮 Join Game!'}
@@ -244,13 +248,14 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
 
   const currentQ = triviaQuestions[game.current_question ?? 0]
   const teamColor = getTeamColor(TEAM_COLORS.findIndex(c => c.name === team.color) || 0)
+  const totalQuestions = game.total_questions || 10
 
   // Waiting screen
   if (game.status === 'waiting') {
     return (
-      <div className="min-h-screen wood-background flex items-center justify-center p-4">
-        <div className="question-banner p-8 rounded-2xl text-center max-w-md">
-          <div className="text-6xl mb-4">⏳</div>
+      <div className="min-h-[100dvh] wood-background flex items-center justify-center p-4 safe-area-inset">
+        <div className="question-banner p-8 rounded-2xl text-center w-full max-w-sm">
+          <div className="text-6xl mb-4">✓</div>
           <h1 
             className="text-3xl font-bold text-white mb-4"
             style={{ fontFamily: 'Mountains of Christmas, cursive' }}
@@ -259,15 +264,15 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
           </h1>
           <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} 
             rounded-xl p-4 mb-6`}>
-            <p className="text-xl text-white font-bold">{team.name}</p>
+            <p className="text-2xl text-white font-bold">{team.name}</p>
           </div>
           <p className="text-yellow-300 text-lg animate-pulse">
-            Waiting for host to start the game...
+            Waiting for host to start...
           </p>
-          <div className="mt-6 text-4xl">
-            <span className="animate-bounce inline-block">🎄</span>
-            <span className="animate-bounce inline-block mx-2" style={{ animationDelay: '0.2s' }}>🎁</span>
-            <span className="animate-bounce inline-block" style={{ animationDelay: '0.4s' }}>⭐</span>
+          <div className="mt-6 text-4xl flex justify-center gap-3">
+            <span className="animate-bounce" style={{ animationDelay: '0s' }}>🎄</span>
+            <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>🎁</span>
+            <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>⭐</span>
           </div>
         </div>
       </div>
@@ -277,8 +282,8 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
   // Game finished screen
   if (game.status === 'finished') {
     return (
-      <div className="min-h-screen wood-background flex items-center justify-center p-4">
-        <div className="question-banner p-8 rounded-2xl text-center max-w-md">
+      <div className="min-h-[100dvh] wood-background flex items-center justify-center p-4 safe-area-inset">
+        <div className="question-banner p-8 rounded-2xl text-center w-full max-w-sm">
           <div className="text-6xl mb-4">🏆</div>
           <h1 
             className="text-3xl font-bold text-yellow-300 mb-4"
@@ -289,16 +294,14 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
           <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} 
             rounded-xl p-4 mb-4`}>
             <p className="text-xl text-white font-bold">{team.name}</p>
-            <p className="text-3xl text-yellow-300 font-bold mt-2">{team.score} pts</p>
+            <p className="text-4xl text-yellow-300 font-bold mt-2">{team.score} pts</p>
           </div>
-          <p className="text-white text-lg mb-6">
-            Thanks for playing! 🎅
-          </p>
+          <p className="text-white text-lg mb-6">Thanks for playing! 🎅</p>
           <button
             onClick={() => router.push('/')}
-            className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xl font-bold 
-              py-3 px-6 rounded-xl border-4 border-yellow-400 shadow-lg 
-              hover:scale-105 transition-transform"
+            className="w-full bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xl font-bold 
+              py-4 px-6 rounded-xl border-4 border-yellow-400 shadow-lg 
+              active:scale-95 transition-transform"
             style={{ fontFamily: 'Mountains of Christmas, cursive' }}
           >
             🏠 Home
@@ -308,102 +311,135 @@ export default function PlayPage({ params }: { params: Promise<{ gameId: string 
     )
   }
 
-  // Playing/Revealing screen
+  // Paused screen
+  if (game.status === 'paused') {
+    return (
+      <div className="min-h-[100dvh] wood-background flex items-center justify-center p-4 safe-area-inset">
+        <div className="question-banner p-8 rounded-2xl text-center w-full max-w-sm">
+          <div className="text-6xl mb-4">⏸️</div>
+          <h1 
+            className="text-3xl font-bold text-yellow-300 mb-4"
+            style={{ fontFamily: 'Mountains of Christmas, cursive' }}
+          >
+            Game Paused
+          </h1>
+          <div className={`bg-gradient-to-br ${teamColor.bg} border-4 ${teamColor.border} 
+            rounded-xl p-3 mb-4`}>
+            <p className="text-white font-bold">{team.name}</p>
+            <p className="text-yellow-300 font-bold">{team.score} pts</p>
+          </div>
+          <p className="text-white text-lg animate-pulse">
+            Waiting for host to resume...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Playing/Revealing screen - Mobile optimized
   return (
-    <div className="min-h-screen wood-background flex flex-col p-4">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4">
+    <div className="min-h-[100dvh] wood-background flex flex-col safe-area-inset">
+      {/* Compact Header */}
+      <div className="flex justify-between items-center p-3 bg-black/30">
         <div className={`bg-gradient-to-br ${teamColor.bg} border-2 ${teamColor.border} 
-          rounded-lg px-3 py-1`}>
-          <span className="text-white font-bold text-sm">{team.name}</span>
-          <span className="text-yellow-300 ml-2">{team.score}</span>
+          rounded-lg px-3 py-1.5 flex items-center gap-2`}>
+          <span className="text-white font-bold text-sm truncate max-w-[80px]">{team.name}</span>
+          <span className="text-yellow-300 font-bold">{team.score}</span>
         </div>
         
-        <div className={`text-2xl font-bold ${timeLeft <= 5 && !hasAnswered ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+        <div className={`text-2xl font-bold px-3 py-1 rounded-lg
+          ${timeLeft <= 5 && !hasAnswered && game.status === 'playing' 
+            ? 'text-red-500 bg-red-900/50 animate-pulse' 
+            : 'text-white bg-black/30'}`}
+        >
           {game.status === 'playing' ? `${timeLeft}s` : '⏸️'}
         </div>
       </div>
 
       {/* Question */}
-      <div className="question-banner p-4 rounded-xl mb-4">
-        <p className="text-xs text-yellow-300 mb-1">
-          Q{(game.current_question ?? 0) + 1} of {triviaQuestions.length}
-        </p>
-        <p 
-          className="text-xl text-white text-center font-semibold"
-          style={{ fontFamily: 'Mountains of Christmas, cursive' }}
-        >
-          {currentQ.question}
-        </p>
+      <div className="p-3">
+        <div className="question-banner p-4 rounded-xl">
+          <p className="text-yellow-300 text-xs text-center mb-1">
+            Q{(game.current_question ?? 0) + 1} / {Math.min(totalQuestions, triviaQuestions.length)}
+          </p>
+          <p 
+            className="text-xl text-white text-center font-semibold leading-tight"
+            style={{ fontFamily: 'Mountains of Christmas, cursive' }}
+          >
+            {currentQ.question}
+          </p>
+        </div>
       </div>
 
-      {/* Answers */}
-      {hasAnswered ? (
-        /* Already Answered */
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className={`text-7xl mb-4 ${answerResult === 'correct' ? 'animate-bounce' : 'animate-pulse'}`}>
-              {answerResult === 'correct' ? '🎉' : '😅'}
-            </div>
-            <p 
-              className={`text-3xl font-bold ${answerResult === 'correct' ? 'text-green-400' : 'text-red-400'}`}
-              style={{ fontFamily: 'Mountains of Christmas, cursive' }}
-            >
-              {answerResult === 'correct' ? 'Correct!' : 'Wrong!'}
-            </p>
-            <p className="text-white mt-2">Waiting for others...</p>
-          </div>
-        </div>
-      ) : game.status === 'revealing' ? (
-        /* Revealing but didn't answer in time */
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-7xl mb-4">⏰</div>
-            <p 
-              className="text-3xl font-bold text-yellow-400"
-              style={{ fontFamily: 'Mountains of Christmas, cursive' }}
-            >
-              Time&apos;s Up!
-            </p>
-            <p className="text-white mt-4">
-              The answer was: <span className="text-green-400 font-bold">{currentQ.answers[currentQ.correct]}</span>
-            </p>
-          </div>
-        </div>
-      ) : (
-        /* Answer Buttons */
-        <div className="flex-1 grid grid-cols-1 gap-3">
-          {currentQ.answers.map((answer, index) => {
-            const colors = [
-              { bg: 'from-green-700 to-green-600', border: 'border-green-400' },
-              { bg: 'from-blue-700 to-blue-600', border: 'border-blue-400' },
-              { bg: 'from-red-700 to-red-600', border: 'border-red-400' },
-              { bg: 'from-yellow-600 to-yellow-500', border: 'border-yellow-400' },
-            ]
-            
-            return (
-              <button
-                key={index}
-                onClick={() => submitAnswer(index)}
-                disabled={hasAnswered || timeLeft === 0}
-                className={`bg-gradient-to-br ${colors[index].bg} ${colors[index].border}
-                  border-4 rounded-xl p-4 text-left
-                  active:scale-95 transition-transform
-                  disabled:opacity-50 disabled:cursor-not-allowed`}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col p-3 pt-0">
+        {hasAnswered ? (
+          /* Already Answered - Feedback */
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className={`text-8xl mb-4 ${answerResult === 'correct' ? 'animate-bounce' : ''}`}>
+                {answerResult === 'correct' ? '🎉' : '😅'}
+              </div>
+              <p 
+                className={`text-4xl font-bold mb-2 ${answerResult === 'correct' ? 'text-green-400' : 'text-red-400'}`}
+                style={{ fontFamily: 'Mountains of Christmas, cursive' }}
               >
-                <span 
-                  className="text-xl font-bold text-white"
-                  style={{ fontFamily: 'Mountains of Christmas, cursive' }}
+                {answerResult === 'correct' ? 'Correct!' : 'Wrong!'}
+              </p>
+              <p className="text-white/70 text-lg">Waiting for others...</p>
+            </div>
+          </div>
+        ) : game.status === 'revealing' ? (
+          /* Revealing - Show correct answer */
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-6xl mb-4">⏰</div>
+              <p 
+                className="text-3xl font-bold text-yellow-400 mb-4"
+                style={{ fontFamily: 'Mountains of Christmas, cursive' }}
+              >
+                Time&apos;s Up!
+              </p>
+              <p className="text-white text-lg">
+                Answer: <span className="text-green-400 font-bold text-xl">{currentQ.answers[currentQ.correct]}</span>
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* Answer Buttons - Touch optimized */
+          <div className="flex-1 flex flex-col gap-3">
+            {currentQ.answers.map((answer, index) => {
+              const colors = [
+                { bg: 'from-green-600 to-green-700', border: 'border-green-400', active: 'active:from-green-500 active:to-green-600' },
+                { bg: 'from-blue-600 to-blue-700', border: 'border-blue-400', active: 'active:from-blue-500 active:to-blue-600' },
+                { bg: 'from-red-600 to-red-700', border: 'border-red-400', active: 'active:from-red-500 active:to-red-600' },
+                { bg: 'from-yellow-500 to-yellow-600', border: 'border-yellow-400', active: 'active:from-yellow-400 active:to-yellow-500' },
+              ]
+              
+              return (
+                <button
+                  key={index}
+                  onClick={() => submitAnswer(index)}
+                  disabled={hasAnswered || timeLeft === 0}
+                  className={`flex-1 min-h-[70px] bg-gradient-to-br ${colors[index].bg} ${colors[index].border} ${colors[index].active}
+                    border-4 rounded-xl px-4 py-3 text-left
+                    active:scale-[0.98] transition-transform touch-manipulation
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    flex items-center`}
                 >
-                  <span className="text-yellow-300 mr-2">{String.fromCharCode(65 + index)})</span>
-                  {answer}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      )}
+                  <span 
+                    className="text-lg font-bold text-white leading-snug"
+                    style={{ fontFamily: 'Mountains of Christmas, cursive' }}
+                  >
+                    <span className="text-yellow-300 mr-2 text-xl">{String.fromCharCode(65 + index)})</span>
+                    {answer}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
-
