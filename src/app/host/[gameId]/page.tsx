@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
 import { triviaQuestions } from '@/lib/questions'
-import { Game, Team, Answer, getTeamColor, DEFAULT_SETTINGS } from '@/lib/types'
+import { Game, Team, Answer, getTeamColorByName, DEFAULT_SETTINGS } from '@/lib/types'
 
 const POINTS_BY_ORDER = [300, 250, 200, 175, 150, 125, 100, 100, 100, 100]
 const REVEAL_ANSWER_TIME = 2000 // Show correct answer for 2 seconds
@@ -264,10 +264,15 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       <div className="relative z-10 flex flex-col h-screen p-6">
         {/* Header */}
         <header className="flex justify-between items-center mb-4">
-          <div className="question-banner px-6 py-3 rounded-xl shadow-lg">
-            <p className="text-yellow-300/80 text-xs uppercase tracking-wider">Game Code</p>
-            <p className="text-4xl font-bold text-white tracking-[0.3em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
-          </div>
+          {/* Only show game code on waiting screen or first question */}
+          {(game.status === 'waiting' || (game.current_question ?? 0) === 0) ? (
+            <div className="question-banner px-6 py-3 rounded-xl shadow-lg">
+              <p className="text-yellow-300/80 text-xs uppercase tracking-wider">Game Code</p>
+              <p className="text-4xl font-bold text-white tracking-[0.3em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
+            </div>
+          ) : (
+            <div className="w-48" /> /* Spacer to maintain layout */
+          )}
           <h1 className="text-5xl font-bold text-white" style={{ fontFamily: 'Mountains of Christmas, cursive', textShadow: '3px 3px 6px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.2)' }}>🎄 Christmas Trivia 🎄</h1>
           <div className="flex items-center gap-4">
             {(game.status === 'playing' || game.status === 'paused') && (
@@ -298,7 +303,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
             <h2 className="text-2xl text-yellow-300 text-center font-bold mb-3" style={{ fontFamily: 'Mountains of Christmas, cursive' }}>🏆 Leaderboard</h2>
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {sortedTeams.map((team, index) => {
-                const color = getTeamColor(teams.findIndex(t => t.id === team.id))
+                const color = getTeamColorByName(team.color)
                 const medal = index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : null
                 return (
                   <div key={team.id} className={`bg-gradient-to-br ${color.bg} border-2 ${color.border} rounded-xl p-3 shadow-md`}>
@@ -360,7 +365,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                   {winners.length > 0 ? (
                     <div className="space-y-4">
                       {winners.map((w, idx) => {
-                        const color = getTeamColor(teams.findIndex(t => t.id === w.team.id))
+                        const color = getTeamColorByName(w.team.color)
                         return (
                           <div 
                             key={w.team.id} 
@@ -434,7 +439,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
                 {sortedCurrentAnswers.map((ans, idx) => {
                   const team = teams.find(t => t.id === ans.team_id)
                   if (!team) return null
-                  const color = getTeamColor(teams.findIndex(t => t.id === team.id))
+                  const color = getTeamColorByName(team.color)
                   return (
                     <div key={ans.id} className={`bg-gradient-to-br ${color.bg} border-2 ${color.border} rounded-xl p-3 shadow-md`}>
                       <div className="flex items-center justify-between">

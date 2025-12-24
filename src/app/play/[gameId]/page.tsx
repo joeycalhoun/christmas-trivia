@@ -308,8 +308,8 @@ function JoinScreen({ game, teamName, setTeamName, selectedColor, setSelectedCol
           </div>
           
           <div className="text-center mb-6">
-            <p className="text-yellow-300/80 text-sm uppercase tracking-wider mb-1">Game Code</p>
-            <p className="text-4xl font-bold text-white tracking-[0.3em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
+            <p className="text-yellow-300/80 text-xs uppercase tracking-wider mb-1">Game Code</p>
+            <p className="text-2xl font-bold text-white tracking-[0.15em]" style={{ fontFamily: 'Cinzel Decorative, serif' }}>{game.code}</p>
           </div>
           
           <div className="mb-5">

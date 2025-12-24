@@ -54,4 +54,9 @@ export const TEAM_COLORS = [
 
 export const getTeamColor = (index: number) => TEAM_COLORS[index % TEAM_COLORS.length]
 
+export const getTeamColorByName = (colorName: string | null) => {
+  const found = TEAM_COLORS.find(c => c.name === colorName)
+  return found || TEAM_COLORS[0]
+}
+
 export const REVEAL_TIME_SECONDS = 5
