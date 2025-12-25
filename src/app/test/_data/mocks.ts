@@ -34,6 +34,7 @@ export function makeMockGame(overrides: Partial<Game> = {}): Game {
     read_aloud_enabled: false,
     read_aloud_seconds: 7,
     answering_enabled: true,
+    difficulty_setting: 'medium',
     created_at: new Date().toISOString(),
   }
   return { ...base, ...overrides }

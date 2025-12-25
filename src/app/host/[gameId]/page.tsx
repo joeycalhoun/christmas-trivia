@@ -60,7 +60,10 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       const response = await fetch('/api/generate-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionNumber }),
+        body: JSON.stringify({ 
+          questionNumber,
+          difficultySetting: settingsRef.current.difficultySetting,
+        }),
       })
       if (!response.ok) throw new Error('Failed to fetch question')
       return await response.json()
@@ -100,6 +103,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
         totalQuestions: gameData.total_questions || DEFAULT_SETTINGS.totalQuestions,
         readAloudEnabled: gameData.read_aloud_enabled ?? DEFAULT_SETTINGS.readAloudEnabled,
         readAloudSeconds: gameData.read_aloud_seconds || DEFAULT_SETTINGS.readAloudSeconds,
+        difficultySetting: gameData.difficulty_setting || DEFAULT_SETTINGS.difficultySetting,
       }
       setSettings(loadedSettings)
       setTimeLeft(loadedSettings.questionTime)
@@ -222,6 +226,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       total_questions: settings.totalQuestions,
       read_aloud_enabled: settings.readAloudEnabled,
       read_aloud_seconds: settings.readAloudSeconds,
+      difficulty_setting: settings.difficultySetting,
     }).eq('id', gameId)
     setGame(prev => prev ? { 
       ...prev, 
@@ -229,6 +234,7 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       total_questions: settings.totalQuestions,
       read_aloud_enabled: settings.readAloudEnabled,
       read_aloud_seconds: settings.readAloudSeconds,
+      difficulty_setting: settings.difficultySetting,
     } : null)
     if (pausedTimeRef.current !== null && pausedTimeRef.current > settings.questionTime) pausedTimeRef.current = settings.questionTime
     setShowSettings(false)
@@ -296,11 +302,12 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
       total_questions: settings.totalQuestions,
       read_aloud_enabled: settings.readAloudEnabled,
       read_aloud_seconds: settings.readAloudSeconds,
+      difficulty_setting: settings.difficultySetting,
       answering_enabled: !useGracePeriod,
     }).eq('id', gameId)
     
     await supabase.from('teams').update({ has_answered: false }).eq('game_id', gameId)
-    setGame(prev => prev ? { ...prev, status: 'playing', current_question: 0, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions, read_aloud_enabled: settings.readAloudEnabled, read_aloud_seconds: settings.readAloudSeconds, answering_enabled: !useGracePeriod } : null)
+    setGame(prev => prev ? { ...prev, status: 'playing', current_question: 0, question_time_seconds: settings.questionTime, total_questions: settings.totalQuestions, read_aloud_enabled: settings.readAloudEnabled, read_aloud_seconds: settings.readAloudSeconds, difficulty_setting: settings.difficultySetting, answering_enabled: !useGracePeriod } : null)
     
     if (useGracePeriod) {
       setIsGracePeriod(true)
@@ -460,6 +467,27 @@ export default function HostPage({ params }: { params: Promise<{ gameId: string 
               <div>
                 <label className="text-yellow-300 text-lg mb-3 block">Questions: <span className="text-white font-bold text-2xl">{settings.totalQuestions}</span></label>
                 <input type="range" min="5" max="50" step="1" value={settings.totalQuestions} onChange={(e) => setSettings(s => ({ ...s, totalQuestions: parseInt(e.target.value) }))} className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-400" />
+              </div>
+              <div>
+                <label className="text-yellow-300 text-lg mb-3 block">Difficulty</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['easy', 'medium', 'hard'] as const).map((diff) => (
+                    <button
+                      key={diff}
+                      onClick={() => setSettings(s => ({ ...s, difficultySetting: diff }))}
+                      className={`py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+                        settings.difficultySetting === diff
+                          ? diff === 'easy' ? 'bg-green-500 text-white ring-2 ring-white' 
+                            : diff === 'medium' ? 'bg-yellow-500 text-black ring-2 ring-white'
+                            : 'bg-red-500 text-white ring-2 ring-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {diff === 'easy' ? '🟢 Easy' : diff === 'medium' ? '🟡 Medium' : '🔴 Hard'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-gray-400 text-xs mt-2">75% of questions will match this difficulty</p>
               </div>
               <div className="border-t border-yellow-400/30 pt-6">
                 <div className="flex items-center justify-between mb-3">

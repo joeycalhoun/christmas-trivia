@@ -13,22 +13,57 @@ const openai = new OpenAI({
 
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'very_hard'] as const
 type Difficulty = typeof DIFFICULTIES[number]
+type DifficultySetting = 'easy' | 'medium' | 'hard'
 
-// Rotate through difficulties to ensure variety
-function getDifficultyForQuestion(questionNumber: number): Difficulty {
-  // Pattern: More challenging with fewer easy questions
-  // easy, medium, hard, medium, very_hard, medium, hard, medium, easy, hard
-  const pattern: Difficulty[] = [
-    'easy', 'medium', 'hard', 'medium', 
-    'very_hard', 'medium', 'hard', 'medium',
-    'easy', 'hard'
-  ]
-  return pattern[questionNumber % pattern.length]
+// Get difficulty based on setting - 75% selected difficulty, 25% variety
+function getDifficultyForQuestion(questionNumber: number, setting: DifficultySetting): Difficulty {
+  // Every 4th question (25%) is a different difficulty for variety
+  const isVarietyQuestion = questionNumber % 4 === 3
+  
+  if (!isVarietyQuestion) {
+    // 75% of questions match the selected difficulty
+    // For 'hard' setting, occasionally include 'very_hard'
+    if (setting === 'hard' && questionNumber % 3 === 0) {
+      return 'very_hard'
+    }
+    return setting
+  }
+  
+  // Variety questions - pick something different from the setting
+  const varietyOptions: Record<DifficultySetting, Difficulty[]> = {
+    'easy': ['medium', 'hard'],
+    'medium': ['easy', 'hard', 'very_hard'],
+    'hard': ['easy', 'medium'],
+  }
+  
+  const options = varietyOptions[setting]
+  return options[questionNumber % options.length]
+}
+
+// Shuffle answers and return new correct index
+function shuffleAnswers(answers: string[], correctIndex: number): { shuffledAnswers: string[], newCorrectIndex: number } {
+  const correctAnswer = answers[correctIndex]
+  
+  // Create array of indices and shuffle them
+  const indices = [0, 1, 2, 3]
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]]
+  }
+  
+  // Reorder answers based on shuffled indices
+  const shuffledAnswers = indices.map(i => answers[i])
+  const newCorrectIndex = shuffledAnswers.indexOf(correctAnswer)
+  
+  return { shuffledAnswers, newCorrectIndex }
 }
 
 export async function POST(request: Request) {
   try {
-    const { questionNumber = 0 } = await request.json()
+    const { questionNumber = 0, difficultySetting = 'medium' } = await request.json() as { 
+      questionNumber?: number
+      difficultySetting?: DifficultySetting 
+    }
     
     // Get the last 30 questions to avoid repetition (across ALL games)
     const { data: recentQuestions } = await supabase
@@ -52,7 +87,7 @@ export async function POST(request: Request) {
       ? `\n\nDO NOT generate any of these recently asked questions OR any questions with the same correct answers:\n${recentQuestionsList.join('\n')}\n\nSpecifically, DO NOT create questions where the answer is any of these: ${recentCorrectAnswers.join(', ')}`
       : ''
     
-    const difficulty = getDifficultyForQuestion(questionNumber)
+    const difficulty = getDifficultyForQuestion(questionNumber, difficultySetting)
     
     const difficultyDescriptions = {
       easy: 'Very easy - common knowledge that most people would know (e.g., "Which reindeer had a red shiny nose?" or "What color is Santa\'s suit?")',
@@ -116,7 +151,12 @@ Where "correct" is the index (0-3) of the correct answer.`
       throw new Error('Invalid question format from OpenAI')
     }
     
-    // Store the question in recent_questions
+    // Shuffle the answers so correct answer isn't always in the same position
+    const { shuffledAnswers, newCorrectIndex } = shuffleAnswers(questionData.answers, questionData.correct)
+    questionData.answers = shuffledAnswers
+    questionData.correct = newCorrectIndex
+    
+    // Store the question in recent_questions (with shuffled answers)
     await supabase.from('recent_questions').insert({
       question_text: questionData.question,
       difficulty: questionData.difficulty || difficulty,

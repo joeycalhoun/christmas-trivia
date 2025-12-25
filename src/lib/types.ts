@@ -1,3 +1,5 @@
+export type DifficultySetting = 'easy' | 'medium' | 'hard'
+
 export interface Game {
   id: string
   code: string
@@ -9,6 +11,7 @@ export interface Game {
   read_aloud_enabled: boolean
   read_aloud_seconds: number
   answering_enabled: boolean
+  difficulty_setting: DifficultySetting
   created_at: string
 }
 
@@ -39,6 +42,7 @@ export interface GameSettings {
   totalQuestions: number
   readAloudEnabled: boolean
   readAloudSeconds: number
+  difficultySetting: DifficultySetting
 }
 
 export interface DynamicQuestion {
@@ -53,6 +57,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   totalQuestions: 10,
   readAloudEnabled: false,
   readAloudSeconds: 7,
+  difficultySetting: 'medium',
 }
 
 export const TEAM_COLORS = [
