@@ -1,0 +1,34 @@
+{
+  "name": "ironquest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A persistent RPG + card-collecting game that rewards eating at a healthy deficit, hitting protein, and training.",
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"node server/server.mjs --port 3001\" \"vite\"",
+    "build": "tsc -b && vite build",
+    "start": "npm run build && node server/server.mjs",
+    "serve": "node server/server.mjs",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
+  }
+}
