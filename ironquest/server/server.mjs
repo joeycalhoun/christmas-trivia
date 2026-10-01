@@ -66,7 +66,9 @@ function writeSave(text) {
 }
 
 let tmpSeq = 0;
-const identity = (s) => (s && s.profile ? `${s.profile.createdAt}|${s.profile.heroName}` : null);
+// Must match the client: a stable id (or the immutable creation date), never the editable name.
+const identity = (s) => (s && s.profile ? (s.profile.heroId ?? `created:${s.profile.createdAt}`) : null);
+const KEEP_REPLACED = 20;
 
 /**
  * Before a save is replaced by a *different* hero, a wiped save, or one with far less history,
@@ -91,6 +93,8 @@ async function archiveIfReplacing(incoming) {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     await fsp.writeFile(path.join(BACKUPS, `replaced-${stamp}.json`), existingText);
     console.log(`  Archived previous save to backups/replaced-${stamp}.json`);
+    const old = (await fsp.readdir(BACKUPS)).filter((f) => f.startsWith('replaced-')).sort();
+    for (const f of old.slice(0, Math.max(0, old.length - KEEP_REPLACED))) await fsp.unlink(path.join(BACKUPS, f));
   }
 }
 

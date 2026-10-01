@@ -32,7 +32,9 @@ async function readServer(): Promise<{ state: GameState | null; reachable: boole
   }
 }
 
-const identity = (s: GameState) => (s.profile ? `${s.profile.createdAt}|${s.profile.heroName}` : null);
+// The hero's identity must not change when the (editable) name does. Older saves without an id fall
+// back to the creation date, which is also immutable.
+const identity = (s: GameState) => (s.profile ? (s.profile.heroId ?? `created:${s.profile.createdAt}`) : null);
 
 /**
  * Decide between the server save and this browser's copy. The server is the source of truth whenever
@@ -57,12 +59,14 @@ export async function fetchServerState() {
   return readServer();
 }
 
+/** True while a change is waiting to upload *or* uploading — the server copy can't be trusted yet. */
 export function hasPendingSave() {
-  return pending !== null;
+  return pending !== null || inFlight > 0;
 }
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pending: GameState | null = null;
+let inFlight = 0;
 
 export function saveState(state: GameState, onStatus: (s: SyncStatus) => void, serverOk: boolean) {
   writeLocal(state);
@@ -81,6 +85,7 @@ async function flush(onStatus: (s: SyncStatus) => void) {
   pending = null;
   timer = null;
   if (!state) return;
+  inFlight++;
   try {
     const res = await fetch('/api/state', {
       method: 'PUT',
@@ -90,6 +95,8 @@ async function flush(onStatus: (s: SyncStatus) => void) {
     onStatus(res.ok ? 'server' : 'error');
   } catch {
     onStatus('error');
+  } finally {
+    inFlight--;
   }
 }
 

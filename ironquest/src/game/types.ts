@@ -20,6 +20,8 @@ export interface Profile {
   calorieOverride?: number | null;
   proteinOverride?: number | null;
   createdAt: string; // date key
+  /** Stable identity for sync — never changes, unlike the editable name. */
+  heroId?: string;
   title?: string | null; // equipped title (achievement id)
   seenGuide?: boolean;
 }

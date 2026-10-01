@@ -74,6 +74,13 @@ describe('stats', () => {
     expect(computeStats(s, '2026-10-03').currentStreak).toBe(0);
   });
 
+  it('needs at least two follow-up waist readings before counting inches lost', () => {
+    const one = freshState({ measurements: [{ date: '2026-09-28', waist: 40 }, { date: '2026-09-29', waist: 36 }] });
+    expect(computeStats(one, TODAY).waistLost).toBe(0); // a single (possibly mistyped) reading counts for nothing
+    const three = freshState({ measurements: [{ date: '2026-09-28', waist: 40 }, { date: '2026-09-29', waist: 39 }, { date: '2026-09-30', waist: 39 }] });
+    expect(computeStats(three, TODAY).waistLost).toBeCloseTo(1);
+  });
+
   it('uses a weigh-in trend for weight lost', () => {
     const s = freshState({ weighIns: [{ date: '2026-09-28', weight: 218 }, { date: '2026-09-29', weight: 216 }] });
     const st = computeStats(s, TODAY);

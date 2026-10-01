@@ -118,12 +118,13 @@ export function computeStats(state: GameState, today: string): Stats {
   }
   const lostLb = Math.max(0, profile.startWeight - lowestTrend);
 
-  // --- Waist: first measurement vs. the best 3-measurement average since.
+  // --- Waist: first measurement vs. the best rolling average (2–3 readings) since, so a single
+  // sloppy or mistyped measurement can't unlock anything on its own.
   const waists = [...(state.measurements ?? [])].sort((a, b) => a.date.localeCompare(b.date));
   const waistStart = waists.length ? waists[0].waist : null;
   const waistLatest = waists.length ? waists[waists.length - 1].waist : null;
   let waistLost = 0;
-  for (let i = 1; i < waists.length; i++) {
+  for (let i = 2; i < waists.length; i++) {
     const win = waists.slice(Math.max(1, i - 2), i + 1);
     const avg = win.reduce((s, w) => s + w.waist, 0) / win.length;
     waistLost = Math.max(waistLost, waistStart! - avg);

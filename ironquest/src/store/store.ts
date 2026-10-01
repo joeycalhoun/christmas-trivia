@@ -154,7 +154,7 @@ export const useStore = create<Store>((set, get) => ({
     const today = get().today;
     get().update((s) => ({
       ...s,
-      profile: { ...p, createdAt: today },
+      profile: { ...p, createdAt: today, heroId: uid() },
       weighIns: [{ date: today, weight: p.startWeight }],
       wallet: { ...s.wallet, coins: s.wallet.coins + STARTER_GIFT.coins },
       packs: [...s.packs, ...STARTER_GIFT.packs],
