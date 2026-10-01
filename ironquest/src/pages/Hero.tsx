@@ -23,6 +23,7 @@ export function Hero() {
         <Link to="/store" className="btn sm">📦 Packs</Link>
         <Link to="/progress" className="btn sm">📈 Progress</Link>
         <Link to="/settings" className="btn sm">⚙️ Settings</Link>
+        <Link to="/guide" className="btn sm">❓ Guide</Link>
       </div>
       <div className="panel mb">
         <div className="row nowrap" style={{ gap: 18, alignItems: 'center' }}>

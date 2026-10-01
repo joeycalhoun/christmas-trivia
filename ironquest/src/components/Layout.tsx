@@ -14,6 +14,7 @@ const NAV = [
   { to: '/store', label: 'Packs', ico: '📦', mobile: false },
   { to: '/hero', label: 'Hero', ico: '🛡️', mobile: true },
   { to: '/progress', label: 'Progress', ico: '📈', mobile: false },
+  { to: '/guide', label: 'How to Play', ico: '❓', mobile: false },
   { to: '/settings', label: 'Settings', ico: '⚙️', mobile: false },
 ];
 

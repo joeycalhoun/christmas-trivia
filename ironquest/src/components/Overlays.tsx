@@ -17,6 +17,18 @@ export function Toasts() {
             <div style={{ fontWeight: 700 }}>{t.title}</div>
             {t.detail && <div className="small muted">{t.detail}</div>}
           </div>
+          {t.action && (
+            <button
+              className="btn sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                t.action!.run();
+                dismiss(t.id);
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -92,9 +104,9 @@ export function PackReveal() {
   return (
     <Modal wide onClose={all ? close : undefined}>
       <div className="center" data-testid="pack-reveal">
-        <h2 style={{ color: PACKS[reveal.type].color }}>📦 {PACKS[reveal.type].label}</h2>
+        <h2 style={{ color: PACKS[reveal.type].color }}>📦 {reveal.count && reveal.count > 1 ? `${reveal.count} packs opened` : PACKS[reveal.type].label}</h2>
         <p className="muted small">{all ? 'Nice pulls!' : 'Tap each card to reveal it.'}</p>
-        <div className="reveal-row mt">
+        <div className={`reveal-row mt ${reveal.pulls.length > 8 ? 'many' : ''}`}>
           {reveal.pulls.map((p, i) => {
             const c = CARD_BY_ID[p.cardId];
             return (

@@ -9,6 +9,8 @@ import { useClaimAll } from '../components/useClaim';
 import { fmt } from '../lib/format';
 import { addDays } from '../lib/dates';
 import { useSealDay } from '../components/QuestRow';
+import { WeeklyRecap } from '../components/WeeklyRecap';
+import { diffDays, weekStart } from '../lib/dates';
 
 export function Dashboard() {
   const view = useView();
@@ -22,6 +24,9 @@ export function Dashboard() {
   const yesterday = addDays(view.today, -1);
   const y = view.stats.day(yesterday);
   const nudgeYesterday = yesterday >= state.profile!.createdAt && y.logged && !y.sealed;
+  const updateProfile = useStore((s) => s.updateProfile);
+  const lastWeek = addDays(view.weekStart, -7);
+  const showRecap = diffDays(view.weekStart, view.today) <= 2 && lastWeek >= weekStart(state.profile!.createdAt);
 
   return (
     <div>
@@ -44,6 +49,25 @@ export function Dashboard() {
         </div>
       </div>
 
+      {!state.profile!.seenGuide && (
+        <div className="panel tight mb row between" data-testid="welcome">
+          <div className="row nowrap">
+            <span style={{ fontSize: 26 }}>🗺️</span>
+            <div>
+              <b>Welcome, adventurer!</b>
+              <div className="small muted">Log food, seal the day, train, then claim rewards and open packs. The 2-minute guide explains every system.</div>
+            </div>
+          </div>
+          <div className="row">
+            <Link to="/guide" className="btn sm primary" onClick={() => updateProfile({ seenGuide: true })}>
+              Read the guide
+            </Link>
+            <button className="btn sm ghost" onClick={() => updateProfile({ seenGuide: true })}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {view.claimable.length > 0 && (
         <div className="panel tight mb row between" style={{ borderColor: '#6b5420', background: 'linear-gradient(90deg,#2a2210,#161b33)' }}>
           <div className="row">
@@ -122,6 +146,7 @@ export function Dashboard() {
         </div>
 
         <div className="stack" style={{ gap: 18 }}>
+          {showRecap && <WeeklyRecap ws={lastWeek} compact />}
           <BossCard raid={view.raid} daysLeft={view.daysLeftInWeek} />
 
           <div className="panel">

@@ -5,6 +5,8 @@ import { FOOD_DB } from '../data/foods';
 import { DateNav } from '../components/DateNav';
 import { NutritionSummary } from '../components/NutritionSummary';
 import { NumberField } from '../components/ui';
+import { CustomFoodEditor, FoodEntryEditor, SaveMealModal } from '../components/FoodEditors';
+import type { FoodEntry } from '../game/types';
 import { addDays } from '../lib/dates';
 import { fmt } from '../lib/format';
 
@@ -33,6 +35,7 @@ export function Food() {
   const state = useStore((s) => s.state);
   const addFood = useStore((s) => s.addFood);
   const removeFood = useStore((s) => s.removeFood);
+  const restoreFood = useStore((s) => s.restoreFood);
   const saveCustomFood = useStore((s) => s.saveCustomFood);
   const removeCustomFood = useStore((s) => s.removeCustomFood);
   const toast = useStore((s) => s.toast);
@@ -41,6 +44,9 @@ export function Food() {
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Pickable | null>(null);
   const [servings, setServings] = useState<number | ''>(1);
+  const [editing, setEditing] = useState<FoodEntry | null>(null);
+  const [editingMine, setEditingMine] = useState<FoodItem | null>(null);
+  const [savingMeal, setSavingMeal] = useState<MealSlot | null>(null);
   const [qa, setQa] = useState<{ name: string; calories: number | ''; protein: number | ''; save: boolean }>({ name: '', calories: '', protein: '', save: false });
 
   const d = view.stats.day(date);
@@ -172,6 +178,11 @@ export function Food() {
                     {m.icon} {m.label}
                   </span>
                   <span className="row small" style={{ gap: 8 }}>
+                    {list.length >= 2 && (
+                      <button className="btn xs ghost" onClick={() => setSavingMeal(m.key)} title="Save this whole meal as one favorite" data-testid={`save-meal-${m.key}`}>
+                        ⭐ Save meal
+                      </button>
+                    )}
                     {canCopy && (
                       <button className="btn xs ghost" onClick={() => copyMeal(m.key)} title="Copy this meal from yesterday">
                         📋 Same as yesterday
@@ -187,13 +198,21 @@ export function Food() {
                 </div>
                 {list.map((f) => (
                   <div key={f.id} className="entry" data-testid="food-entry">
-                    <div className="nm">
+                    <div className="nm" style={{ cursor: 'pointer' }} onClick={() => setEditing(f)} title="Tap to edit">
                       {f.name}
                       {f.servings && f.servings !== 1 ? <span className="dim small"> × {f.servings}</span> : null}
+                      <span className="dim tiny"> ✎</span>
                     </div>
                     <div className="num small">{fmt(f.calories)} kcal</div>
                     <div className="num small green hide-sm">{fmt(f.protein, 1)} g</div>
-                    <button className="btn xs ghost" onClick={() => removeFood(f.id)} aria-label={`Remove ${f.name}`}>
+                    <button
+                      className="btn xs ghost"
+                      onClick={() => {
+                        removeFood(f.id);
+                        toast({ icon: '🗑️', title: `Removed ${f.name}`, tone: 'info', action: { label: 'Undo', run: () => restoreFood(f) } });
+                      }}
+                      aria-label={`Remove ${f.name}`}
+                    >
                       ✕
                     </button>
                   </div>
@@ -301,9 +320,14 @@ export function Food() {
                       <span style={{ cursor: 'pointer' }} onClick={() => setPicked(f)}>
                         {f.name} <span className="dim">· {fmt(f.calories)} kcal · {fmt(f.protein, 1)} g</span>
                       </span>
-                      <button className="btn xs ghost" onClick={() => removeCustomFood(f.id)}>
-                        ✕
-                      </button>
+                      <span className="row" style={{ gap: 4 }}>
+                        <button className="btn xs ghost" onClick={() => setEditingMine(f)} aria-label={`Edit ${f.name}`}>
+                          ✎
+                        </button>
+                        <button className="btn xs ghost" onClick={() => removeCustomFood(f.id)} aria-label={`Delete ${f.name}`}>
+                          ✕
+                        </button>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -312,6 +336,9 @@ export function Food() {
           </div>
         </div>
       </div>
+      {editing && <FoodEntryEditor entry={editing} onClose={() => setEditing(null)} />}
+      {editingMine && <CustomFoodEditor food={editingMine} onClose={() => setEditingMine(null)} />}
+      {savingMeal && <SaveMealModal meal={savingMeal} entries={entries.filter((f) => f.meal === savingMeal)} onClose={() => setSavingMeal(null)} />}
     </div>
   );
 }

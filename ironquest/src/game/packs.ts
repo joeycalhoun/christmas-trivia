@@ -10,6 +10,8 @@ export interface PulledCard {
 export interface PackResult {
   type: PackType;
   pulls: PulledCard[];
+  /** Set when several packs were opened at once. */
+  count?: number;
 }
 
 function rollRarity(type: PackType, rng: () => number): Rarity {

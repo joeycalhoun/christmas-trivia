@@ -66,7 +66,36 @@ function writeSave(text) {
 }
 
 let tmpSeq = 0;
+const identity = (s) => (s && s.profile ? `${s.profile.createdAt}|${s.profile.heroName}` : null);
+
+/**
+ * Before a save is replaced by a *different* hero, a wiped save, or one with far less history,
+ * keep a permanent copy. A reset (or a stray device) can then always be undone by hand.
+ */
+async function archiveIfReplacing(incoming) {
+  let existingText;
+  try {
+    existingText = await fsp.readFile(SAVE, 'utf8');
+  } catch {
+    return;
+  }
+  let existing;
+  try {
+    existing = JSON.parse(existingText);
+  } catch {
+    existing = null;
+  }
+  if (!existing || !existing.profile) return;
+  const shrank = (incoming.foods?.length ?? 0) + 30 < (existing.foods?.length ?? 0);
+  if (identity(incoming) !== identity(existing) || shrank) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    await fsp.writeFile(path.join(BACKUPS, `replaced-${stamp}.json`), existingText);
+    console.log(`  Archived previous save to backups/replaced-${stamp}.json`);
+  }
+}
+
 async function doWriteSave(text) {
+  await archiveIfReplacing(JSON.parse(text));
   const tmp = `${SAVE}.${process.pid}.${tmpSeq++}.tmp`;
   await fsp.writeFile(tmp, text);
   await fsp.rename(tmp, SAVE);

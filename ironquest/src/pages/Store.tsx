@@ -10,6 +10,7 @@ export function Store() {
   const state = useStore((s) => s.state);
   const buy = useStore((s) => s.buy);
   const open = useStore((s) => s.open);
+  const openAll = useStore((s) => s.openAll);
   const toast = useStore((s) => s.toast);
   const counts = TYPES.map((t) => state.packs.filter((p) => p === t).length);
 
@@ -31,7 +32,14 @@ export function Store() {
       <div className="panel mb">
         <div className="panel-head">
           <h2>Your unopened packs</h2>
-          <span className="sub">Legendary pity: guaranteed within {PITY_LIMIT - state.pity} more packs</span>
+          <div className="row">
+            <span className="sub">Legendary guaranteed within {PITY_LIMIT - state.pity} packs</span>
+            {state.packs.length > 1 && (
+              <button className="btn primary sm" onClick={openAll} data-testid="open-all">
+                Open all ({state.packs.length})
+              </button>
+            )}
+          </div>
         </div>
         {state.packs.length === 0 ? (
           <div className="empty">No unopened packs. Earn them from rewards or buy one below.</div>

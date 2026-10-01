@@ -23,6 +23,10 @@ Then open **http://localhost:3030**.
 - Your progress is saved to `ironquest/data/save.json`, with a rolling daily backup in `data/backups/`
   (the last 30 days are kept). There is also an Export/Import button in Settings.
 - Different port: `npm start -- --port 4000` (or set `PORT=4000`).
+- **Phone + computer:** both read and write the same server save. When you switch back to a device, it pulls the latest copy.
+  If a save is ever about to be replaced by a *different* hero or a wiped save, the server first keeps a permanent copy
+  in `data/backups/replaced-*.json`.
+- The server has no login, so anyone on your Wi-Fi who knows the address can open it. Run it on a home network you trust.
 
 ## How the game works
 
@@ -49,10 +53,21 @@ Then open **http://localhost:3030**.
 
 ### Fast logging
 
-Search a built-in database of about 120 common foods (including fast-food staples), tap, set servings, and add.
-Recents and your saved foods come up first. "Same as yesterday" copies a whole meal in one tap.
-"Smart picks" suggests high-protein foods that fit your remaining calories.
-For training, "Repeat a past workout" pre-fills last session's weights, so you only type reps.
+- **Food:** search about 120 common foods (including fast-food staples), tap, set servings, and add.
+  Recents and ⭐ My Foods come first. ⭐ **Save meal** turns a whole meal into one tap-to-log favorite.
+  📋 **Same as yesterday** copies a meal. Tap any logged item to edit its servings, numbers, or meal. Deleting has **Undo**.
+  🧠 **Smart picks** suggests high-protein foods that fit your remaining calories.
+- **Training:** "Repeat a past workout" pre-fills last session's weights, so you only type reps.
+  Each exercise shows what you did last time. There's a ⏱ rest timer (beeps and vibrates) and support for custom exercises.
+- **Body:** daily weigh-ins, steps, and weekly waist measurements. The waist has its own achievement track,
+  because it keeps dropping when the scale stalls.
+
+### Staying motivated over months
+
+- The **"Almost There"** panel always shows the nearest goals: the next level, profession milestones, and achievement tiers.
+- A **16-week consistency calendar** (on Progress) colors every day: on target + protein, on target, protein hit, over, or logged.
+- A **weekly recap** each Monday grades last week's raid, challenges, protein and target days, and weight change.
+- **❓ How to Play** in the app explains every system using your own numbers.
 
 ## Development
 

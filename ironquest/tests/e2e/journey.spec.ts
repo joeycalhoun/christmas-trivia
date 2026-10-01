@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
+import { emptyState } from '../../src/game/types';
 
 const SHOTS = process.env.SHOTS_DIR;
 test.beforeEach(async ({ context }) => {
@@ -24,7 +25,11 @@ test('full journey: onboarding → log → claim → packs → squad → persist
     await page.getByRole('button', { name: 'Onward!' }).click();
   });
 
+  // Start from a blank save regardless of what other specs left on the server.
+  await page.request.put('/api/state', { data: emptyState() });
   await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
   await page.getByTestId('hero-name').fill('Joey');
   await shot(page, '01-onboarding');
   await page.getByTestId('next').click();

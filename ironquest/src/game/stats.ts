@@ -1,6 +1,6 @@
 import type { GameState, MealSlot, SkillKey } from './types';
 import { computeTargets, calorieStatus, type CalorieStatus, type Targets } from './nutrition';
-import { EXERCISE_BY_ID } from '../data/exercises';
+import { findExercise } from '../data/exercises';
 import { addDays } from '../lib/dates';
 
 export interface MealTotals {
@@ -22,6 +22,7 @@ export interface DayStats {
   sealed: boolean;
   onTarget: boolean;
   weighIn: number | null;
+  measured: boolean;
   steps: number;
   sets: number;
   volume: number;
@@ -50,6 +51,9 @@ export interface Stats {
   trendWeight: number;
   lowestTrend: number;
   lostLb: number;
+  waistStart: number | null;
+  waistLatest: number | null;
+  waistLost: number;
   totals: {
     loggedDays: number;
     proteinDays: number;
@@ -114,6 +118,19 @@ export function computeStats(state: GameState, today: string): Stats {
   }
   const lostLb = Math.max(0, profile.startWeight - lowestTrend);
 
+  // --- Waist: first measurement vs. the best 3-measurement average since.
+  const waists = [...(state.measurements ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  const waistStart = waists.length ? waists[0].waist : null;
+  const waistLatest = waists.length ? waists[waists.length - 1].waist : null;
+  let waistLost = 0;
+  for (let i = 1; i < waists.length; i++) {
+    const win = waists.slice(Math.max(1, i - 2), i + 1);
+    const avg = win.reduce((s, w) => s + w.waist, 0) / win.length;
+    waistLost = Math.max(waistLost, waistStart! - avg);
+  }
+
+  const waistDates = new Set(waists.map((m) => m.date));
+
   const targetCache = new Map<number, Targets>();
   const targetsFor = (date: string) => {
     const w = weightOn(date);
@@ -156,7 +173,7 @@ export function computeStats(state: GameState, today: string): Stats {
     let ironXp = 0;
     let prCount = 0;
     for (const ex of s.exercises) {
-      const def = EXERCISE_BY_ID[ex.exerciseId];
+      const def = findExercise(ex.exerciseId, state.customExercises);
       let sessionBest = 0;
       let bestSet: { weight: number; reps: number } | null = null;
       for (const set of ex.sets) {
@@ -217,6 +234,7 @@ export function computeStats(state: GameState, today: string): Stats {
       sealed,
       onTarget: sealed && status === 'on',
       weighIn: weighByDate.get(date) ?? null,
+      measured: waistDates.has(date),
       steps,
       sets,
       volume: Math.round(t?.volume ?? 0),
@@ -234,6 +252,7 @@ export function computeStats(state: GameState, today: string): Stats {
     ...foodByDate.keys(),
     ...trainByDate.keys(),
     ...weighByDate.keys(),
+    ...waistDates,
     ...Object.keys(state.steps),
     ...Object.keys(state.sealed),
   ]);
@@ -272,6 +291,7 @@ export function computeStats(state: GameState, today: string): Stats {
     if (d.sealed && d.logged) skillXp.discipline += 40;
     if (d.onTarget) skillXp.discipline += 110;
     if (d.weighIn !== null) skillXp.discipline += 20;
+    if (d.measured) skillXp.discipline += 15;
   }
   for (const k of Object.keys(skillXp) as SkillKey[]) skillXp[k] = Math.round(skillXp[k]);
 
@@ -300,6 +320,9 @@ export function computeStats(state: GameState, today: string): Stats {
     trendWeight,
     lowestTrend,
     lostLb,
+    waistStart,
+    waistLatest,
+    waistLost,
     totals,
     currentStreak,
     bestStreak,

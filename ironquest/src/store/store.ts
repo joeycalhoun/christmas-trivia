@@ -2,9 +2,10 @@ import { create } from 'zustand';
 import { emptyState, normalizeState, type CardioEntry, type ExerciseEntry, type FoodEntry, type FoodItem, type GameState, type PackType, type Profile, type Session } from '../game/types';
 import { claimReward, computeGame, type AppliedReward, type GameView } from '../game/engine';
 import { buyPack, craftCard, openPack, type PackResult } from '../game/packs';
+import { bestSquad, CARD_BY_ID, PACKS, RARITIES } from '../game/cards';
 import { todayKey } from '../lib/dates';
 import { uid } from '../lib/rng';
-import { clearLocal, flushOnExit, loadState, saveState, type SyncStatus } from './persistence';
+import { clearLocal, fetchServerState, flushOnExit, hasPendingSave, loadState, pickState, saveState, type SyncStatus } from './persistence';
 
 export interface Toast {
   id: string;
@@ -12,6 +13,7 @@ export interface Toast {
   title: string;
   detail?: string;
   tone?: 'gold' | 'good' | 'bad' | 'info';
+  action?: { label: string; run: () => void };
 }
 
 interface Store {
@@ -25,6 +27,7 @@ interface Store {
   levelUp: { level: number; rank: string } | null;
 
   init: () => Promise<void>;
+  syncFromServer: () => Promise<void>;
   refreshToday: () => void;
   update: (fn: (s: GameState) => GameState) => void;
   toast: (t: Omit<Toast, 'id'>) => void;
@@ -37,22 +40,28 @@ interface Store {
   addFood: (e: Omit<FoodEntry, 'id' | 'loggedAt'>) => void;
   updateFood: (id: string, patch: Partial<FoodEntry>) => void;
   removeFood: (id: string) => void;
+  restoreFood: (entry: FoodEntry) => void;
   saveCustomFood: (f: Omit<FoodItem, 'id' | 'custom'>) => void;
+  updateCustomFood: (id: string, patch: Partial<FoodItem>) => void;
   removeCustomFood: (id: string) => void;
 
   setSteps: (date: string, steps: number) => void;
   logWeight: (date: string, weight: number | null) => void;
+  logWaist: (date: string, waist: number | null) => void;
   sealDay: (date: string) => void;
   unsealDay: (date: string) => void;
 
   updateSession: (date: string, fn: (s: Session) => Session) => void;
   addExercise: (date: string, exerciseId: string, sets?: ExerciseEntry['sets']) => void;
   addCardio: (date: string, c: Omit<CardioEntry, 'id'>) => void;
+  addCustomExercise: (name: string, bodyweight: boolean) => string;
 
   claim: (id: string) => AppliedReward | null;
   claimAll: () => AppliedReward[];
   buy: (type: PackType) => boolean;
   open: (type: PackType) => PackResult | null;
+  openAll: () => PackResult | null;
+  autoSquad: () => void;
   closeReveal: () => void;
   craft: (cardId: string) => boolean;
   setSquadSlot: (slot: number, cardId: string | null) => void;
@@ -99,6 +108,29 @@ export const useStore = create<Store>((set, get) => ({
     window.addEventListener('pagehide', flushOnExit);
   },
 
+  syncFromServer: async () => {
+    if (hasPendingSave() || !get().loaded) return;
+    const { state: server, reachable } = await fetchServerState();
+    if (!reachable) {
+      if (get().serverOk) set({ serverOk: false, sync: 'error' });
+      return;
+    }
+    if (hasPendingSave()) return; // the user changed something while we were fetching
+    const current = get().state;
+    const best = pickState(server, current);
+    if (!get().serverOk) set({ serverOk: true });
+    const changed = best && best !== current && (best.updatedAt !== current.updatedAt || best.profile?.createdAt !== current.profile?.createdAt);
+    if (best && changed) {
+      set({ state: best, sync: 'server' });
+      saveState(best, () => {}, false); // refresh the local copy only
+    } else if (current.profile && (!server || current.updatedAt > server.updatedAt)) {
+      // The server is behind (e.g. it was offline while we logged) — push our copy up.
+      saveState(current, (sync) => set({ sync }), true);
+    } else {
+      set({ sync: 'server' });
+    }
+  },
+
   refreshToday: () => {
     const t = todayKey();
     if (t !== get().today) set({ today: t });
@@ -113,7 +145,7 @@ export const useStore = create<Store>((set, get) => ({
   toast: (t) => {
     const id = uid();
     set({ toasts: [...get().toasts, { ...t, id }].slice(-5) });
-    setTimeout(() => get().dismissToast(id), 4200);
+    setTimeout(() => get().dismissToast(id), t.action ? 7000 : 4200);
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   setLevelUp: (levelUp) => set({ levelUp }),
@@ -138,12 +170,14 @@ export const useStore = create<Store>((set, get) => ({
   addFood: (e) => get().update((s) => ({ ...s, foods: [...s.foods, { ...e, id: uid(), loggedAt: Date.now() }] })),
   updateFood: (id, patch) => get().update((s) => ({ ...s, foods: s.foods.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
   removeFood: (id) => get().update((s) => ({ ...s, foods: s.foods.filter((f) => f.id !== id) })),
+  restoreFood: (entry) => get().update((s) => (s.foods.some((f) => f.id === entry.id) ? s : { ...s, foods: [...s.foods, entry] })),
   saveCustomFood: (f) =>
     get().update((s) => {
       const existing = s.customFoods.find((c) => c.name.toLowerCase() === f.name.toLowerCase());
       const item: FoodItem = { ...f, id: existing?.id ?? `my_${uid()}`, custom: true };
       return { ...s, customFoods: existing ? s.customFoods.map((c) => (c.id === existing.id ? item : c)) : [...s.customFoods, item] };
     }),
+  updateCustomFood: (id, patch) => get().update((s) => ({ ...s, customFoods: s.customFoods.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
   removeCustomFood: (id) => get().update((s) => ({ ...s, customFoods: s.customFoods.filter((c) => c.id !== id) })),
 
   setSteps: (date, steps) =>
@@ -157,6 +191,11 @@ export const useStore = create<Store>((set, get) => ({
     get().update((s) => {
       const rest = s.weighIns.filter((w) => w.date !== date);
       return { ...s, weighIns: weight && weight > 0 ? [...rest, { date, weight }].sort((a, b) => a.date.localeCompare(b.date)) : rest };
+    }),
+  logWaist: (date, waist) =>
+    get().update((s) => {
+      const rest = s.measurements.filter((m) => m.date !== date);
+      return { ...s, measurements: waist && waist > 0 ? [...rest, { date, waist }].sort((a, b) => a.date.localeCompare(b.date)) : rest };
     }),
   sealDay: (date) => get().update((s) => ({ ...s, sealed: { ...s.sealed, [date]: Date.now() } })),
   unsealDay: (date) =>
@@ -181,6 +220,13 @@ export const useStore = create<Store>((set, get) => ({
     })),
   addCardio: (date, c) => get().updateSession(date, (sess) => ({ ...sess, cardio: [...sess.cardio, { ...c, id: uid() }] })),
 
+  addCustomExercise: (name, bodyweight) => {
+    const existing = get().state.customExercises.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+    const id = `custom_${uid()}`;
+    get().update((s) => ({ ...s, customExercises: [...s.customExercises, { id, name, bodyweight }] }));
+    return id;
+  },
   claim: (id) => {
     const { state, today } = get();
     const res = claimReward(state, getView(state, today), id);
@@ -219,6 +265,31 @@ export const useStore = create<Store>((set, get) => ({
     get().update(() => res.state);
     set({ packReveal: res.result });
     return res.result;
+  },
+  openAll: () => {
+    let s = get().state;
+    if (!s.packs.length) return null;
+    const pulls: PackResult['pulls'] = [];
+    let best: PackType = s.packs[0];
+    const count = s.packs.length;
+    while (s.packs.length) {
+      const type = s.packs[0];
+      if (PACKS[type].cost > PACKS[best].cost) best = type;
+      const res = openPack(s, type)!;
+      s = res.state;
+      pulls.push(...res.result.pulls);
+    }
+    get().update(() => s);
+    // Best cards last, same as a single pack.
+    pulls.sort((a, b) => RARITIES.indexOf(CARD_BY_ID[a.cardId].rarity) - RARITIES.indexOf(CARD_BY_ID[b.cardId].rarity));
+    const result: PackResult = { type: best, pulls, count };
+    set({ packReveal: result });
+    return result;
+  },
+  autoSquad: () => {
+    const owned = Object.keys(get().state.cards).filter((id) => get().state.cards[id] > 0);
+    const squad = bestSquad(owned);
+    get().update((s) => ({ ...s, squad }));
   },
   closeReveal: () => set({ packReveal: null }),
   craft: (cardId) => {

@@ -163,7 +163,7 @@ export function dailyQuests(state: GameState, d: DayStats): { quests: QuestView[
   return { quests, sweep };
 }
 
-function weeklyQuests(state: GameState, stats: Stats, ws: string): { quests: QuestView[]; sweep: QuestView } {
+export function weeklyQuests(state: GameState, stats: Stats, ws: string): { quests: QuestView[]; sweep: QuestView } {
   const ctx: WeekCtx = { days: weekDays(ws).map((d) => stats.day(d)) };
   const quests = WEEKLIES.map((def) => questView(def, ctx, `weekly:${ws}:${def.key}`, 'weekly', state.claims, true, 'Weekly challenge'));
   const sweep = sweepView(`weekly:${ws}:sweep`, 'weekly', WEEKLY_SWEEP, quests, state.claims, 'Weekly bonus', 'Complete every weekly challenge.');

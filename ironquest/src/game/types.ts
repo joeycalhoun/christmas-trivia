@@ -21,6 +21,7 @@ export interface Profile {
   proteinOverride?: number | null;
   createdAt: string; // date key
   title?: string | null; // equipped title (achievement id)
+  seenGuide?: boolean;
 }
 
 export interface FoodItem {
@@ -56,6 +57,12 @@ export interface ExerciseEntry {
   sets: SetEntry[];
 }
 
+export interface CustomExercise {
+  id: string;
+  name: string;
+  bodyweight?: boolean;
+}
+
 export interface CardioEntry {
   id: string;
   type: string;
@@ -74,6 +81,11 @@ export interface WeighIn {
   weight: number;
 }
 
+export interface Measurement {
+  date: string;
+  waist: number; // inches
+}
+
 export interface ClaimRecord {
   id: string;
   at: number;
@@ -88,8 +100,10 @@ export interface GameState {
   profile: Profile | null;
   foods: FoodEntry[];
   customFoods: FoodItem[];
+  customExercises: CustomExercise[];
   sessions: Record<string, Session>;
   weighIns: WeighIn[];
+  measurements: Measurement[];
   steps: Record<string, number>;
   sealed: Record<string, number>;
   claims: Record<string, ClaimRecord>;
@@ -110,8 +124,10 @@ export function emptyState(): GameState {
     profile: null,
     foods: [],
     customFoods: [],
+    customExercises: [],
     sessions: {},
     weighIns: [],
+    measurements: [],
     steps: {},
     sealed: {},
     claims: {},
@@ -138,8 +154,10 @@ export function normalizeState(raw: unknown): GameState {
     version: STATE_VERSION,
     foods: Array.isArray(r.foods) ? r.foods : [],
     customFoods: Array.isArray(r.customFoods) ? r.customFoods : [],
+    customExercises: Array.isArray(r.customExercises) ? r.customExercises : [],
     sessions: r.sessions && typeof r.sessions === 'object' ? r.sessions : {},
     weighIns: Array.isArray(r.weighIns) ? r.weighIns : [],
+    measurements: Array.isArray(r.measurements) ? r.measurements : [],
     steps: r.steps && typeof r.steps === 'object' ? r.steps : {},
     sealed: r.sealed && typeof r.sealed === 'object' ? r.sealed : {},
     claims: r.claims && typeof r.claims === 'object' ? r.claims : {},

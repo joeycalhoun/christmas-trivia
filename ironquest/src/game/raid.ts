@@ -33,6 +33,7 @@ export const DAMAGE_RULES = [
   { key: 'cardio', label: 'Cardio minutes', per: 15 },
   { key: 'steps', label: 'Steps (per 1k)', per: 50 },
   { key: 'weigh', label: 'Weigh-ins', per: 200 },
+  { key: 'measure', label: 'Waist measurements', per: 150 },
   { key: 'pr', label: 'Personal records', per: 300 },
 ] as const;
 
@@ -48,6 +49,7 @@ export function dayDamage(d: DayStats): Record<DamageKey, number> {
     cardio: Math.min(d.cardioMinutes, 120) * 15,
     steps: Math.floor(Math.min(d.steps, 20_000) / 1000) * 50,
     weigh: d.weighIn !== null ? 200 : 0,
+    measure: d.measured ? 150 : 0,
     pr: Math.min(d.prs, 5) * 300,
   };
 }

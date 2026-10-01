@@ -32,12 +32,33 @@ async function readServer(): Promise<{ state: GameState | null; reachable: boole
   }
 }
 
-/** Load the newest of the server save and the browser's local copy. */
+const identity = (s: GameState) => (s.profile ? `${s.profile.createdAt}|${s.profile.heroName}` : null);
+
+/**
+ * Decide between the server save and this browser's copy. The server is the source of truth whenever
+ * the two disagree about *which hero* this is (e.g. a phone that created a throwaway hero while the server
+ * was unreachable must never clobber the real save). Same hero → the most recently changed copy wins.
+ */
+export function pickState(server: GameState | null, local: GameState | null): GameState | null {
+  if (!server || !server.profile) return local?.profile ? local : (server ?? local);
+  if (!local || !local.profile) return server;
+  if (identity(server) !== identity(local)) return server;
+  return local.updatedAt > server.updatedAt ? local : server;
+}
+
+/** Load the best of the server save and the browser's local copy. */
 export async function loadState(): Promise<{ state: GameState | null; serverOk: boolean }> {
   const [server, local] = await Promise.all([readServer(), Promise.resolve(readLocal())]);
-  const candidates = [server.state, local].filter((s): s is GameState => !!s);
-  candidates.sort((a, b) => b.updatedAt - a.updatedAt);
-  return { state: candidates[0] ?? null, serverOk: server.reachable };
+  return { state: pickState(server.state, local), serverOk: server.reachable };
+}
+
+/** Fetch the server copy (used to pick up changes made on another device). */
+export async function fetchServerState() {
+  return readServer();
+}
+
+export function hasPendingSave() {
+  return pending !== null;
 }
 
 let timer: ReturnType<typeof setTimeout> | null = null;

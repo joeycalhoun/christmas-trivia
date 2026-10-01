@@ -5,6 +5,7 @@ import { Tile } from '../components/ui';
 import { addDays, rangeKeys, shortDate, weekStart, prettyDate } from '../lib/dates';
 import { fmt } from '../lib/format';
 import { exerciseName } from '../data/exercises';
+import { ConsistencyCalendar } from '../components/ConsistencyCalendar';
 
 const AXIS = { stroke: '#6b739b', fontSize: 11, tickLine: false, axisLine: false } as const;
 const GRID = { stroke: '#232a4d', strokeDasharray: '0', vertical: false } as const;
@@ -17,6 +18,8 @@ const TOOLTIP = {
 export function Progress() {
   const view = useView();
   const state = useStore((s) => s.state);
+  const logWeight = useStore((s) => s.logWeight);
+  const logWaist = useStore((s) => s.logWaist);
   const [range, setRange] = useState(30);
   const p = state.profile!;
   const st = view.stats;
@@ -50,6 +53,19 @@ export function Progress() {
       .map(([ws, v]) => ({ week: shortDate(ws), volume: v }));
   }, [state.sessions, st]);
 
+  const waistData = useMemo(
+    () => [...state.measurements].sort((a, b) => a.date.localeCompare(b.date)).filter((m) => m.date >= from).map((m) => ({ date: shortDate(m.date), waist: m.waist })),
+    [state.measurements, from],
+  );
+  const bodyLog = useMemo(() => {
+    const dates = new Set([...state.weighIns.map((w) => w.date), ...state.measurements.map((m) => m.date)]);
+    return [...dates]
+      .sort()
+      .reverse()
+      .slice(0, 14)
+      .map((date) => ({ date, weight: state.weighIns.find((w) => w.date === date)?.weight, waist: state.measurements.find((m) => m.date === date)?.waist }));
+  }, [state.weighIns, state.measurements]);
+
   const logged = days.map((k) => st.day(k)).filter((d) => d.logged);
   const avgCal = logged.length ? logged.reduce((s, d) => s + d.calories, 0) / logged.length : 0;
   const avgP = logged.length ? logged.reduce((s, d) => s + d.protein, 0) / logged.length : 0;
@@ -82,6 +98,19 @@ export function Progress() {
         <Tile k={`Avg protein (${range}d)`} v={<>{fmt(avgP)} <small>g</small></>} />
         <Tile k="Strength sessions" v={st.totals.workouts} sub={`${fmt(st.totals.volume)} lb moved`} />
         <Tile k="Best streak" v={<>{st.bestStreak} <small>days</small></>} sub={`Current: ${st.currentStreak}`} />
+        <Tile
+          k="Waist"
+          v={st.waistLatest ? <>{fmt(st.waistLatest, 1)} <small>in</small></> : '—'}
+          sub={st.waistStart ? `${fmt(st.waistLost, 1)} in lost (from ${fmt(st.waistStart, 1)})` : 'Log it weekly on Home/Train'}
+        />
+      </div>
+
+      <div className="panel mb">
+        <div className="panel-head">
+          <h2>Consistency</h2>
+          <span className="sub">Last 16 weeks · hover a day for details</span>
+        </div>
+        <ConsistencyCalendar day={st.day} today={view.today} />
       </div>
 
       <div className="grid two">
@@ -173,6 +202,63 @@ export function Progress() {
       <div className="grid two mt">
         <div className="panel">
           <div className="panel-head">
+            <h2>Waist</h2>
+            <span className="sub">Inches — measure at the navel, same time each week</span>
+          </div>
+          {waistData.length < 2 ? (
+            <div className="empty">Log your waist at least twice to see a trend. It often keeps dropping when the scale stalls.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={waistData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid {...GRID} />
+                <XAxis dataKey="date" {...AXIS} minTickGap={20} />
+                <YAxis {...AXIS} domain={[(min: number) => Math.floor(min - 1), (max: number) => Math.ceil(max + 1)]} />
+                <Tooltip {...TOOLTIP} />
+                <Line isAnimationActive={false} dataKey="waist" name="Waist (in)" stroke="#60a5fa" strokeWidth={2} dot={{ r: 4 }} type="monotone" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div className="panel">
+          <div className="panel-head">
+            <h2>Body log</h2>
+            <span className="sub">Recent weigh-ins & measurements</span>
+          </div>
+          {bodyLog.length === 0 ? (
+            <div className="empty">No entries yet.</div>
+          ) : (
+            <div className="stack" style={{ gap: 4 }}>
+              {bodyLog.map((b) => (
+                <div key={b.date} className="row between small" style={{ padding: '4px 0', borderBottom: '1px solid var(--line)' }} data-testid="body-log-row">
+                  <span>{prettyDate(b.date, view.today)}</span>
+                  <span className="row" style={{ gap: 12 }}>
+                    {b.weight !== undefined && (
+                      <span className="row" style={{ gap: 4 }}>
+                        <b className="num">{fmt(b.weight, 1)} lb</b>
+                        <button className="btn xs ghost" onClick={() => logWeight(b.date, null)} aria-label="Delete weigh-in">
+                          ✕
+                        </button>
+                      </span>
+                    )}
+                    {b.waist !== undefined && (
+                      <span className="row" style={{ gap: 4 }}>
+                        <b className="num">{fmt(b.waist, 1)} in</b>
+                        <button className="btn xs ghost" onClick={() => logWaist(b.date, null)} aria-label="Delete waist">
+                          ✕
+                        </button>
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid two mt">
+        <div className="panel">
+          <div className="panel-head">
             <h2>Strength — best estimated 1RM</h2>
           </div>
           {keyLifts.length === 0 ? (
@@ -181,7 +267,7 @@ export function Progress() {
             <div className="stack" style={{ gap: 6 }}>
               {keyLifts.map(([id, v]) => (
                 <div key={id} className="row between small">
-                  <span>{exerciseName(id)}</span>
+                  <span>{exerciseName(id, state.customExercises)}</span>
                   <b className="num">{fmt(v)} lb</b>
                 </div>
               ))}
@@ -203,7 +289,7 @@ export function Progress() {
                 .map((pr, i) => (
                   <div key={i} className="row between small">
                     <span>
-                      🏆 {exerciseName(pr.exerciseId)} <span className="dim">· {prettyDate(pr.date)}</span>
+                      🏆 {exerciseName(pr.exerciseId, state.customExercises)} <span className="dim">· {prettyDate(pr.date)}</span>
                     </span>
                     <b className="num">
                       {pr.weight || 'BW'} × {pr.reps}

@@ -13,6 +13,7 @@ import { Cards } from './pages/Cards';
 import { Store } from './pages/Store';
 import { Hero } from './pages/Hero';
 import { Settings } from './pages/Settings';
+import { Guide } from './pages/Guide';
 
 // Charts are the heaviest dependency; load them only when the Progress page opens.
 const Progress = lazy(() => import('./pages/Progress').then((m) => ({ default: m.Progress })));
@@ -22,20 +23,28 @@ export function App() {
   const hasHero = useStore((s) => !!s.state.profile);
   const init = useStore((s) => s.init);
   const refreshToday = useStore((s) => s.refreshToday);
+  const syncFromServer = useStore((s) => s.syncFromServer);
 
   useEffect(() => {
     init();
   }, [init]);
 
-  // Roll over to a new day if the app is left open past midnight.
+  // Roll over to a new day if the app is left open past midnight, and pick up changes made on
+  // another device (e.g. logged on your phone, now looking at the laptop).
   useEffect(() => {
-    const id = setInterval(refreshToday, 60_000);
-    window.addEventListener('focus', refreshToday);
+    const tick = () => {
+      refreshToday();
+      if (document.visibilityState === 'visible') syncFromServer();
+    };
+    const id = setInterval(tick, 60_000);
+    window.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', tick);
     return () => {
       clearInterval(id);
-      window.removeEventListener('focus', refreshToday);
+      window.removeEventListener('focus', tick);
+      document.removeEventListener('visibilitychange', tick);
     };
-  }, [refreshToday]);
+  }, [refreshToday, syncFromServer]);
 
   if (!loaded) {
     return (
@@ -70,6 +79,7 @@ export function App() {
           <Route path="hero" element={<Hero />} />
           <Route path="progress" element={<Suspense fallback={<div className="muted">Loading charts…</div>}><Progress /></Suspense>} />
           <Route path="settings" element={<Settings />} />
+          <Route path="guide" element={<Guide />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

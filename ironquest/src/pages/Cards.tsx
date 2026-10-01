@@ -11,6 +11,7 @@ export function Cards() {
   const view = useView();
   const state = useStore((s) => s.state);
   const setSlot = useStore((s) => s.setSquadSlot);
+  const autoSquad = useStore((s) => s.autoSquad);
   const craft = useStore((s) => s.craft);
   const toast = useStore((s) => s.toast);
   const [picking, setPicking] = useState<number | null>(null);
@@ -43,7 +44,18 @@ export function Cards() {
       <div className="panel mb">
         <div className="panel-head">
           <h2>Active Squad</h2>
-          <span className="sub">
+          <button
+            className="btn sm"
+            onClick={() => {
+              autoSquad();
+              toast({ icon: '🧠', title: 'Squad optimized', detail: 'Picked the cards that maximize your reward bonuses.', tone: 'good' });
+            }}
+            disabled={owned.length === 0}
+            data-testid="auto-squad"
+          >
+            🧠 Auto-pick best
+          </button>
+          <span className="sub" style={{ flexBasis: '100%' }}>
             Team rating <b className="gold">{b.ovr}</b>
             {state.squad.some((x) => !x) && ' (empty slots count as 0 — fill all 5!)'} · Bonuses apply to every reward you claim
           </span>

@@ -64,3 +64,16 @@ describe('packs', () => {
     expect(crafted.wallet.essence).toBe(100 - RARITY_INFO.common.craftCost);
   });
 });
+
+describe('auto squad', () => {
+  it('fills all five slots and beats a naive top-rating pick', async () => {
+    const { bestSquad, squadBonus, squadScore } = await import('../../src/game/cards');
+    const owned = CARDS.filter((_, i) => i % 3 === 0).map((c) => c.id);
+    const auto = bestSquad(owned);
+    expect(auto.filter(Boolean)).toHaveLength(5);
+    expect(new Set(auto).size).toBe(5);
+    const naive = [...owned].sort((a, b) => CARD_BY_ID[b].ovr - CARD_BY_ID[a].ovr).slice(0, 5);
+    expect(squadScore(squadBonus(auto))).toBeGreaterThanOrEqual(squadScore(squadBonus(naive)));
+    expect(bestSquad(owned.slice(0, 2)).filter(Boolean)).toHaveLength(2);
+  });
+});

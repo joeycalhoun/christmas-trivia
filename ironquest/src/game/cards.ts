@@ -201,3 +201,52 @@ export const PACKS: Record<PackType, { label: string; cost: number; cards: numbe
 };
 
 export const PITY_LIMIT = 40;
+
+/** One number to compare squads: overall XP% + coin% plus half credit for category-specific coin perks. */
+export function squadScore(b: SquadBonus): number {
+  const cat = b.categoryPct.protein + b.categoryPct.discipline + b.categoryPct.training + b.categoryPct.raid;
+  return b.xpPct + b.coinPct + cat * 0.5;
+}
+
+/** Greedy build + swap passes. Not exhaustive, but finds chemistry and perk stacks well in practice. */
+export function bestSquad(owned: string[]): (string | null)[] {
+  const pool = owned.filter((id) => CARD_BY_ID[id]);
+  const squad: (string | null)[] = [null, null, null, null, null];
+  const score = (s: (string | null)[]) => squadScore(squadBonus(s)) + s.filter(Boolean).length * 0.001;
+  for (let slot = 0; slot < SQUAD_SIZE; slot++) {
+    let best: string | null = null;
+    let bestScore = -Infinity;
+    for (const id of pool) {
+      if (squad.includes(id)) continue;
+      squad[slot] = id;
+      const sc = score(squad);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = id;
+      }
+    }
+    squad[slot] = best;
+  }
+  for (let pass = 0; pass < 4; pass++) {
+    let improved = false;
+    for (let slot = 0; slot < SQUAD_SIZE; slot++) {
+      const current = score(squad);
+      const keep = squad[slot];
+      let bestId = keep;
+      let bestScore = current;
+      for (const id of pool) {
+        if (squad.includes(id)) continue;
+        squad[slot] = id;
+        const sc = score(squad);
+        if (sc > bestScore + 1e-9) {
+          bestScore = sc;
+          bestId = id;
+        }
+      }
+      squad[slot] = bestId;
+      if (bestId !== keep) improved = true;
+    }
+    if (!improved) break;
+  }
+  return squad;
+}

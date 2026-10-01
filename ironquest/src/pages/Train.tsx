@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore, useView } from '../store/store';
-import { CARDIO_TYPES, EXERCISES, EXERCISE_BY_ID, exerciseName, type MuscleGroup } from '../data/exercises';
+import { CARDIO_TYPES, EXERCISES, exerciseName, findExercise, type MuscleGroup } from '../data/exercises';
 import type { ExerciseEntry, SetEntry } from '../game/types';
 import { DateNav } from '../components/DateNav';
 import { QuickLog } from '../components/QuickLog';
@@ -8,6 +8,7 @@ import { NumberField, Tile } from '../components/ui';
 import { prettyDate } from '../lib/dates';
 import { fmt } from '../lib/format';
 import { MIN_STRENGTH_SETS } from '../game/stats';
+import { RestTimerChip, useRestTimer } from '../components/RestTimer';
 
 const GROUPS: MuscleGroup[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full'];
 
@@ -22,6 +23,10 @@ export function Train() {
   const [exPick, setExPick] = useState('');
   const [cardioType, setCardioType] = useState(CARDIO_TYPES[0]);
   const [cardioMin, setCardioMin] = useState<number | ''>('');
+  const timer = useRestTimer();
+  const addCustomExercise = useStore((s) => s.addCustomExercise);
+  const [customName, setCustomName] = useState('');
+  const [customBw, setCustomBw] = useState(false);
 
   const session = state.sessions[date];
   const d = view.stats.day(date);
@@ -56,8 +61,18 @@ export function Train() {
       exercises: s.exercises.map((e) => (e.id === exId ? fn(e) : e)).filter((e): e is ExerciseEntry => !!e),
     }));
 
+  const createCustom = () => {
+    const name = customName.trim();
+    if (!name) return;
+    const id = addCustomExercise(name, customBw);
+    addExercise(date, id);
+    setCustomName('');
+    setCustomBw(false);
+    setExPick('');
+  };
+
   const doAddExercise = () => {
-    if (!exPick) return;
+    if (!exPick || exPick === '__custom') return;
     const prev = lastTime[exPick];
     // Pre-fill with last time's weight so you only need to type reps.
     addExercise(date, exPick, prev ? [{ weight: prev.sets[0].weight, reps: 0 }] : undefined);
@@ -108,7 +123,7 @@ export function Train() {
                   <option value="">🔁 Repeat a past workout…</option>
                   {pastSessions.map((k) => (
                     <option key={k} value={k}>
-                      {prettyDate(k)} — {state.sessions[k].exercises.map((e) => exerciseName(e.exerciseId)).slice(0, 3).join(', ')}
+                      {prettyDate(k)} — {state.sessions[k].exercises.map((e) => exerciseName(e.exerciseId, state.customExercises)).slice(0, 3).join(', ')}
                     </option>
                   ))}
                 </select>
@@ -116,7 +131,7 @@ export function Train() {
             </div>
             <div className="stack">
               {(session?.exercises ?? []).map((ex) => {
-                const def = EXERCISE_BY_ID[ex.exerciseId];
+                const def = findExercise(ex.exerciseId, state.customExercises);
                 const prev = lastTime[ex.exerciseId];
                 const pr = prsToday.find((p) => p.exerciseId === ex.exerciseId);
                 const best = view.stats.bestE1rm[ex.exerciseId];
@@ -160,13 +175,18 @@ export function Train() {
                         </button>
                       </div>
                     ))}
-                    <button
-                      className="btn sm mt"
-                      onClick={() => patchExercise(ex.id, (e) => ({ ...e, sets: [...e.sets, { ...(e.sets[e.sets.length - 1] ?? { weight: 0, reps: 0 }) }] }))}
-                      data-testid="add-set"
-                    >
-                      + Add set
-                    </button>
+                    <div className="row mt" style={{ gap: 6 }}>
+                      <button
+                        className="btn sm"
+                        onClick={() => patchExercise(ex.id, (e) => ({ ...e, sets: [...e.sets, { ...(e.sets[e.sets.length - 1] ?? { weight: 0, reps: 0 }) }] }))}
+                        data-testid="add-set"
+                      >
+                        + Add set
+                      </button>
+                      <button className="btn sm ghost" onClick={() => timer.start()} data-testid="start-rest">
+                        ⏱ Rest {timer.preset}s
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -174,6 +194,15 @@ export function Train() {
               <div className="row nowrap">
                 <select value={exPick} onChange={(e) => setExPick(e.target.value)} data-testid="exercise-pick">
                   <option value="">Choose an exercise…</option>
+                  {state.customExercises.length > 0 && (
+                    <optgroup label="My exercises">
+                      {state.customExercises.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                   {GROUPS.map((g) => (
                     <optgroup key={g} label={g[0].toUpperCase() + g.slice(1)}>
                       {EXERCISES.filter((e) => e.group === g).map((e) => (
@@ -183,11 +212,28 @@ export function Train() {
                       ))}
                     </optgroup>
                   ))}
+                  <option value="__custom">➕ Create a custom exercise…</option>
                 </select>
-                <button className="btn primary" onClick={doAddExercise} disabled={!exPick} data-testid="add-exercise">
+                <button className="btn primary" onClick={doAddExercise} disabled={!exPick || exPick === '__custom'} data-testid="add-exercise">
                   + Add
                 </button>
               </div>
+              {exPick === '__custom' && (
+                <div className="exercise stack" data-testid="custom-exercise">
+                  <label className="field">
+                    Exercise name
+                    <input type="text" value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="e.g. Cable Lateral Raise" autoFocus data-testid="custom-name" />
+                  </label>
+                  <div className="row between">
+                    <label className="row small muted" style={{ gap: 6, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={customBw} onChange={(e) => setCustomBw(e.target.checked)} /> Bodyweight movement
+                    </label>
+                    <button className="btn primary sm" onClick={createCustom} disabled={!customName.trim()} data-testid="custom-create">
+                      Create & add
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -232,6 +278,19 @@ export function Train() {
           </div>
           <div className="panel">
             <div className="panel-head">
+              <h2>⏱ Rest timer</h2>
+            </div>
+            <div className="row">
+              {[60, 90, 120, 180].map((s) => (
+                <button key={s} className={`btn sm ${timer.preset === s ? 'primary' : ''}`} onClick={() => timer.setPreset(s)}>
+                  {s / 60} min
+                </button>
+              ))}
+            </div>
+            <div className="tiny dim mt">Default rest when you tap ⏱ on an exercise. Beeps and vibrates when time's up.</div>
+          </div>
+          <div className="panel">
+            <div className="panel-head">
               <h2>How XP works</h2>
             </div>
             <ul className="small muted" style={{ margin: 0, paddingLeft: 18 }}>
@@ -243,6 +302,7 @@ export function Train() {
           </div>
         </div>
       </div>
+      <RestTimerChip />
     </div>
   );
 }

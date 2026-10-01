@@ -4,6 +4,8 @@ import { QuestRow } from '../components/QuestRow';
 import { BossCard } from '../components/BossCard';
 import { NutritionSummary } from '../components/NutritionSummary';
 import { dailyQuests } from '../game/engine';
+import { WeeklyRecap } from '../components/WeeklyRecap';
+import { weekStart } from '../lib/dates';
 import { addDays, prettyDate } from '../lib/dates';
 import { fmt } from '../lib/format';
 
@@ -70,6 +72,7 @@ export function Quests() {
       )}
 
       {tab === 'weekly' && (
+        <div className="stack" style={{ gap: 18 }}>
         <div className="panel">
           <div className="panel-head">
             <h2>This week's challenges</h2>
@@ -81,6 +84,8 @@ export function Quests() {
             ))}
             <QuestRow q={view.weeklySweep} />
           </div>
+        </div>
+        {addDays(view.weekStart, -7) >= weekStart(state.profile!.createdAt) && <WeeklyRecap ws={addDays(view.weekStart, -7)} />}
         </div>
       )}
 
